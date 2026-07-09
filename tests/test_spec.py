@@ -17,3 +17,12 @@ def test_load_problem_missing_field_raises(tmp_path):
     (tmp_path / "spec.yaml").write_text("name: x\n")
     with pytest.raises(ValueError):
         load_problem(tmp_path)
+
+def test_load_problem_missing_file_raises(tmp_path):
+    with pytest.raises(ValueError):
+        load_problem(tmp_path)
+
+def test_load_problem_non_dict_raises(tmp_path):
+    (tmp_path / "spec.yaml").write_text("- a\n- b\n")
+    with pytest.raises(ValueError):
+        load_problem(tmp_path)

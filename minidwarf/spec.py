@@ -21,7 +21,12 @@ class Problem:
 
 def load_problem(root: Path) -> Problem:
     root = Path(root)
-    data = yaml.safe_load((root / "spec.yaml").read_text()) or {}
+    spec_path = root / "spec.yaml"
+    if not spec_path.exists():
+        raise ValueError(f"{spec_path} does not exist")
+    data = yaml.safe_load(spec_path.read_text()) or {}
+    if not isinstance(data, dict):
+        raise ValueError(f"{spec_path} must be a mapping, got {type(data).__name__}")
     missing = [k for k in _REQUIRED if k not in data]
     if missing:
         raise ValueError(f"{root}/spec.yaml missing fields: {missing}")
