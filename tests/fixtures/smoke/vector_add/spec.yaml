@@ -1,0 +1,9 @@
+name: vector_add
+dwarf: structured_grids
+difficulty: easy
+rtol: 1.0e-5
+atol: 1.0e-6
+n_inputs: 2
+n_outputs: 1
+eval_shapes: [[1048576], [1500000]]
+baseline: author_kernel
