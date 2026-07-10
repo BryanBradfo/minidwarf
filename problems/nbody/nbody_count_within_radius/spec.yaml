@@ -1,0 +1,9 @@
+name: nbody_count_within_radius
+dwarf: nbody
+difficulty: medium
+rtol: 0.0
+atol: 0.5
+n_inputs: 1
+n_outputs: 1
+eval_shapes: [[4096], [5000]]
+baseline: author_kernel
