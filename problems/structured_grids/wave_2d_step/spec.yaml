@@ -1,0 +1,9 @@
+name: wave_2d_step
+dwarf: structured_grids
+difficulty: hard
+rtol: 1.0e-3
+atol: 1.0e-4
+n_inputs: 2
+n_outputs: 1
+eval_shapes: [[512, 512], [640, 384]]
+baseline: author_kernel
