@@ -1,0 +1,9 @@
+name: sobel_2d
+dwarf: structured_grids
+difficulty: medium
+rtol: 1.0e-3
+atol: 1.0e-4
+n_inputs: 1
+n_outputs: 1
+eval_shapes: [[512, 512], [640, 384]]
+baseline: author_kernel
