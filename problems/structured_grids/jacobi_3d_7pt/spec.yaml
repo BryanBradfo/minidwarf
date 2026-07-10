@@ -1,0 +1,9 @@
+name: jacobi_3d_7pt
+dwarf: structured_grids
+difficulty: medium
+rtol: 1.0e-4
+atol: 1.0e-5
+n_inputs: 1
+n_outputs: 1
+eval_shapes: [[128, 128, 128], [160, 160, 96]]
+baseline: author_kernel
