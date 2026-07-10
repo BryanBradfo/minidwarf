@@ -1,0 +1,9 @@
+name: pairwise_mean_dist
+dwarf: nbody
+difficulty: easy
+rtol: 1.0e-4
+atol: 1.0e-4
+n_inputs: 1
+n_outputs: 1
+eval_shapes: [[4096], [5000]]
+baseline: author_kernel
