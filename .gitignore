@@ -3,3 +3,4 @@ __pycache__/
 *.so
 results/*.tmp
 .venv/
+*.deb
