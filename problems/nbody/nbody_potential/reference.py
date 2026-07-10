@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+import numpy as np
+
+EPS = 1e-2
+
+def run(inputs, shape):
+    pos = inputs[0].astype(np.float64)
+    d = pos[None, :] - pos[:, None]  # d[i, j] = pos[j] - pos[i]
+    r2 = d * d
+    val = 1.0 / np.sqrt(r2 + EPS)
+    np.fill_diagonal(val, 0.0)
+    out = val.sum(axis=1)
+    return [out.astype(np.float32)]
