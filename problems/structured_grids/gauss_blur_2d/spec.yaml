@@ -1,0 +1,9 @@
+name: gauss_blur_2d
+dwarf: structured_grids
+difficulty: easy
+rtol: 1.0e-4
+atol: 1.0e-5
+n_inputs: 1
+n_outputs: 1
+eval_shapes: [[512, 512], [640, 384]]
+baseline: author_kernel
