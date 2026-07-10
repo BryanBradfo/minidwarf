@@ -71,7 +71,15 @@ run a trivial `sm_120` kernel before grading anything.
 
 ## Install
 
+MiniDwarf is meant to be run from a source checkout, not installed as a
+self-contained wheel: the CUDA driver (`harness/driver.cu`) and the
+`problems/` tree live in the repo and are resolved by the CLI relative to
+the checkout at runtime. Clone the repo and install it editable so the
+`minidwarf` package points back at that checkout:
+
 ```bash
+git clone <this repo>
+cd minidwarf
 pip install -e .
 python scripts/check_env.py
 ```
@@ -119,7 +127,11 @@ Each submitted kernel goes through the same four stages:
    a hardcoded shape or memorizes an expected output will fail correctness
    on at least one shape.
 4. **Timing.** Both the candidate and the baseline are run for multiple
-   reps; the median wall time of each is used to compute a speedup ratio.
+   reps; each rep's device-side GPU time is measured with `cudaEvent`
+   (not host wall-clock time). For each `eval_shapes` entry the median of
+   its reps is taken, and the reported speedup is
+   `sum(baseline medians) / sum(candidate medians)` across all shapes (see
+   `grade.py`) -- not a single wall-clock median.
 
 ## The `fast_p` metric
 
@@ -156,6 +168,36 @@ extern "C" void minidwarf_solve(const float* const* inputs,
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full per-problem file
 layout and how to add new problems.
+
+## Known limitations (v1)
+
+- **Shipped experts equal the baselines.** The `solutions/expert_v1.cu`
+  file for every v1 problem is byte-identical to that problem's
+  `baseline.cu`. They exist to prove the problem is solvable within its
+  `rtol`/`atol` with a real kernel, not as optimized reference
+  implementations -- expect `speedup ~= 1.0` when grading them, not a
+  demonstration of achievable speedup. Optimized expert solutions
+  (`expert_v2.cu`, etc.) are welcome contributions; see
+  [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Timing trust model assumes a non-adversarial candidate.** The driver
+  (`harness/driver.cu`) reuses the same input/output device buffers across
+  the warmup call and all timed reps, and correctness is checked once from
+  the final buffer contents after timing completes. This means the timing
+  path trusts that the candidate actually does the same work on every
+  rep -- a deliberately adversarial kernel could, in principle, do its real
+  work during the untimed warmup call and no-op (or memoize) during the
+  timed reps to inflate its reported speedup. v1 does not defend against
+  this; the intended mitigation for v1.1 is to re-randomize inputs before
+  each timed rep (a naive per-rep memset was deliberately not added in
+  this pass, since it would distort the speedup ratio for honest kernels
+  without a properly designed fix).
+- **The anti-gaming property is against the prompt, not against repo
+  access.** `eval_shapes` (in each problem's `spec.yaml`) and the grading
+  `seed` (in `grade.py`) are committed in this repository. The guarantee
+  described above ("a kernel can't hardcode a shape or memorize an
+  output") holds for a model that sees only `prompt.md` -- it does not
+  hold against someone who reads the repository itself, since the eval
+  shapes and seeds are not secret from a repo-level adversary.
 
 ## License
 

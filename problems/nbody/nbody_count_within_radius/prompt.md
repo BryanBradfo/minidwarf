@@ -4,7 +4,7 @@ Implement a radius-based neighbor count for `N` bodies laid out on a line
 (1D positions), stored as a flat `float32` array `pos` of length `N`.
 
 For every body `i`, count how many other bodies `j` (`j != i`) lie strictly
-within a fixed radius `R = 3.0f`:
+within a fixed radius `R = 3.0`:
 
 ```
 out[i] = (float) count of { j != i : |pos[i] - pos[j]| < R }

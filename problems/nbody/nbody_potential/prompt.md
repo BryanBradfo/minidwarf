@@ -12,7 +12,7 @@ r2  = d * d
 out[i] = sum_{j != i}  1 / sqrt(r2 + eps)
 ```
 
-with softening constant `eps = 1e-2f` (added to `r2` before the square
+with softening constant `eps = 1e-2` (added to `r2` before the square
 root, to avoid a singularity when two bodies coincide).
 
 The sum for body `i` runs over **all** other bodies `j` in `[0, N)`

@@ -12,7 +12,7 @@ r2  = d * d
 out[i] = sum_{j != i}  d / (r2 + eps)^1.5
 ```
 
-with softening constant `eps = 1e-2f` (added to `r2` before raising to the
+with softening constant `eps = 1e-2` (added to `r2` before raising to the
 `1.5` power, to avoid a singularity when two bodies coincide).
 
 The sum for body `i` runs over **all** other bodies `j` in `[0, N)`

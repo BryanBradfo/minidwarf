@@ -56,10 +56,13 @@ real kernel error, not reference rounding error.
 **Output-size invariant**: every array in the `outputs` list returned by a
 `minidwarf_solve` implementation (and by `reference.py`) must have length
 `prod(dims)` for the corresponding output, where `dims` is the shape
-passed to the kernel. Don't return a reduced/summary shape unless the
-problem is explicitly a reduction to a scalar or fixed-size output --
-state that clearly in `spec.yaml`/`prompt.md` if so (e.g.
-`nbody_potential` reduces to one scalar per call).
+passed to the kernel. This holds for every v1 problem, including
+reduction-shaped ones like `nbody_potential` (which returns the
+per-body potential, i.e. one value per particle, not a single scalar).
+Don't return a reduced/summary shape smaller than `prod(dims)` unless a
+future problem is explicitly a reduction to a scalar or fixed-size
+output -- state that clearly in `spec.yaml`/`prompt.md` if so, since the
+driver assumes every output has `prod(dims)` elements.
 
 ### Tolerance guidance (`rtol`/`atol`)
 
@@ -98,11 +101,15 @@ shape that is clearly a toy example, distinct from anything in
 
 ### `solutions/`
 
-At least one working, non-baseline `minidwarf_solve` implementation
-(e.g. `solutions/expert_v1.cu`) that a maintainer can point to as evidence
-the problem is solvable and the tolerances are achievable by a real
-kernel, not just the baseline. Add more solutions (e.g. alternative tiling
-strategies) if useful, named `expert_v2.cu`, etc.
+At least one working `minidwarf_solve` implementation (e.g.
+`solutions/expert_v1.cu`) that a maintainer can point to as evidence the
+problem is solvable and the tolerances are achievable by a real kernel.
+For v1, the maintainer's `expert_v1.cu` files are byte-identical to
+`baseline.cu` -- they establish solvability, not achievable speedup (see
+"Known limitations" in the [README](README.md)). Optimized expert
+solutions that actually improve on the baseline (e.g. alternative tiling
+strategies, named `expert_v2.cu`, etc.) are welcome and encouraged
+contributions.
 
 ## Adding an expert solution to an existing problem
 
