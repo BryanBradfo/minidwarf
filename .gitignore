@@ -4,3 +4,4 @@ __pycache__/
 results/*.tmp
 .venv/
 *.deb
+*.egg-info/
