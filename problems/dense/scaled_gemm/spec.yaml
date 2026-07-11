@@ -1,0 +1,9 @@
+name: scaled_gemm
+dwarf: dense
+difficulty: hard
+rtol: 1.0e-3
+atol: 1.0e-3
+n_inputs: 2
+n_outputs: 1
+eval_shapes: [[256, 256, 256], [288, 224, 192]]
+baseline: cublas
