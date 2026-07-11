@@ -14,7 +14,8 @@ def test_every_problem_in_exactly_one_split():
     assert len(listed) == len(set(listed))  # no duplicates, full coverage
 
 
-def test_split_is_balanced_six_and_six():
+def test_split_is_balanced():
+    # The benchmark grows across versions, so the split is not pinned to a fixed
+    # count; it must stay near-balanced (valid and test differ by at most one).
     s = yaml.safe_load((ROOT / "SPLITS.yaml").read_text())
-    assert len(s["valid"]) == 6
-    assert len(s["test"]) == 6
+    assert abs(len(s["valid"]) - len(s["test"])) <= 1
