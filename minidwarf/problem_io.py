@@ -11,15 +11,18 @@ def load_module_fn(problem_root: Path, filename: str, fn: str):
     return getattr(mod, fn)
 
 def write_arrays(path: Path, arrays: list[np.ndarray]) -> None:
-    with open(path, "wb") as f:
+    with open(path, "wb") as fh:
         for a in arrays:
-            f.write(np.ascontiguousarray(a, dtype=np.float32).tobytes())
+            if a.dtype == np.int32:
+                fh.write(np.ascontiguousarray(a, dtype=np.int32).tobytes())
+            else:
+                fh.write(np.ascontiguousarray(a, dtype=np.float32).tobytes())
 
-def read_arrays(path: Path, shapes) -> list[np.ndarray]:
-    raw = np.fromfile(path, dtype=np.float32)
+def read_arrays(path: Path, specs) -> list[np.ndarray]:
+    raw = np.fromfile(path, dtype=np.uint8)
     out, off = [], 0
-    for shp in shapes:
-        n = int(np.prod(shp))
-        out.append(raw[off:off + n].reshape(shp))
-        off += n
+    for shape, dtype in specs:
+        n = int(np.prod(shape)); nbytes = n * 4
+        chunk = raw[off:off + nbytes].view(dtype).reshape(shape)
+        out.append(chunk); off += nbytes
     return out

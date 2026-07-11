@@ -13,10 +13,19 @@ def test_generate_and_reference_roundtrip():
     outs = ref(ins, [16])
     np.testing.assert_allclose(outs[0], ins[0] + ins[1], rtol=1e-6)
 
+def test_write_read_mixed_dtype_roundtrip(tmp_path):
+    f = np.arange(6, dtype=np.float32)
+    i = np.array([0, 3, 5, 9], dtype=np.int32)
+    p = tmp_path / "mixed.bin"
+    write_arrays(p, [f, i])
+    back = read_arrays(p, [((6,), np.float32), ((4,), np.int32)])
+    np.testing.assert_array_equal(back[0], f); assert back[0].dtype == np.float32
+    np.testing.assert_array_equal(back[1], i); assert back[1].dtype == np.int32
+
 def test_array_serialization_roundtrip(tmp_path):
     arrs = [np.arange(8, dtype=np.float32), np.ones(4, dtype=np.float32)]
     p = tmp_path / "buf.bin"
     write_arrays(p, arrs)
-    back = read_arrays(p, [(8,), (4,)])
+    back = read_arrays(p, [((8,), np.float32), ((4,), np.float32)])
     np.testing.assert_array_equal(back[0], arrs[0])
     np.testing.assert_array_equal(back[1], arrs[1])
