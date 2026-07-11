@@ -13,16 +13,18 @@ def load_module_fn(problem_root: Path, filename: str, fn: str):
 def write_arrays(path: Path, arrays: list[np.ndarray]) -> None:
     with open(path, "wb") as fh:
         for a in arrays:
-            if a.dtype == np.int32:
+            if a.dtype == np.float32:
+                fh.write(np.ascontiguousarray(a, dtype=np.float32).tobytes())
+            elif a.dtype == np.int32:
                 fh.write(np.ascontiguousarray(a, dtype=np.int32).tobytes())
             else:
-                fh.write(np.ascontiguousarray(a, dtype=np.float32).tobytes())
+                raise ValueError(f"unsupported dtype {a.dtype}; only float32 and int32 are supported")
 
 def read_arrays(path: Path, specs) -> list[np.ndarray]:
     raw = np.fromfile(path, dtype=np.uint8)
     out, off = [], 0
     for shape, dtype in specs:
-        n = int(np.prod(shape)); nbytes = n * 4
+        n = int(np.prod(shape)); nbytes = n * np.dtype(dtype).itemsize
         chunk = raw[off:off + nbytes].view(dtype).reshape(shape)
         out.append(chunk); off += nbytes
     return out

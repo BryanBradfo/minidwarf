@@ -29,3 +29,11 @@ def test_array_serialization_roundtrip(tmp_path):
     back = read_arrays(p, [((8,), np.float32), ((4,), np.float32)])
     np.testing.assert_array_equal(back[0], arrs[0])
     np.testing.assert_array_equal(back[1], arrs[1])
+
+def test_write_arrays_rejects_unsupported_dtype(tmp_path):
+    p = tmp_path / "x.bin"
+    try:
+        write_arrays(p, [np.arange(4, dtype=np.int64)])
+        assert False, "Expected ValueError for int64 dtype"
+    except ValueError as e:
+        assert "unsupported dtype" in str(e)
