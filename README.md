@@ -80,7 +80,7 @@ reproducible.
 
 Timings (and therefore `fast_p`, see below) are hardware-dependent.
 Numbers reported without a hardware note are not comparable. The reference
-hardware for MiniDwarf v1 is:
+hardware for MiniDwarf is:
 
 - GPU: NVIDIA RTX 5070 (Blackwell, `sm_120`), 8 GB VRAM
 - CUDA Toolkit >= 12.8, with `nvcc` on `PATH`
