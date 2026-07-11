@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# MiniDwarf v1 valid/test split. Each of the 12 v1 problems is listed
-# exactly once, 6 in `valid` and 6 in `test`, balanced 3+3 across the two
-# Berkeley Dwarfs (Structured Grids, N-Body).
+# MiniDwarf valid/test split. Every problem is listed exactly once, kept
+# near-balanced between `valid` and `test` as the benchmark grows across
+# versions (v1: 12 problems, 6/6, balanced 3+3 across Structured Grids and
+# N-Body; v2 adds 6 Dense Linear Algebra problems, split 4/5 - see below -
+# for a 9/9 total).
 valid:
   - gauss_blur_2d
   - heat_2d_step
@@ -11,6 +13,8 @@ valid:
   - nbody_potential
   - coulomb_1d
   - sgemm
+  - gemv
+  - transpose
 test:
   - laplacian_2d_5pt
   - sobel_2d
@@ -18,3 +22,6 @@ test:
   - knn_distance_1d
   - pairwise_mean_dist
   - nbody_count_within_radius
+  - gemm_bias
+  - syrk
+  - scaled_gemm
