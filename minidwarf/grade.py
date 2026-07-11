@@ -5,6 +5,7 @@ import numpy as np
 from .spec import load_problem
 from .problem_io import load_module_fn
 from .compile import compile_binary, CompileError
+from .baselines import link_flags
 from .runner import run_binary, RunError, RunResult
 from .correctness import check_correct
 
@@ -22,8 +23,9 @@ def grade_problem(problem_root, candidate_cu, work_dir, seed=12345, reps=30) -> 
     ref = load_module_fn(p.root, "reference.py", "run")
     work_dir = Path(work_dir)
     try:
-        cand_exe = compile_binary(Path(candidate_cu), work_dir / "cand")
-        base_exe = compile_binary(p.root / "baseline.cu", work_dir / "base")
+        flags = link_flags(p.baseline)
+        cand_exe = compile_binary(Path(candidate_cu), work_dir / "cand", extra_flags=flags)
+        base_exe = compile_binary(p.root / "baseline.cu", work_dir / "base", extra_flags=flags)
     except CompileError:
         return ProblemResult(p.name, p.dwarf, "compile_error", False, None)
 
