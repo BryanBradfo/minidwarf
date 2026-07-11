@@ -5,5 +5,5 @@ rtol: 1.0e-3
 atol: 1.0e-3
 n_inputs: 2
 n_outputs: 1
-eval_shapes: [[256, 256, 256], [288, 224, 192]]
+eval_shapes: [[256, 256, 256], [210, 170, 150]]
 baseline: cublas

@@ -3,7 +3,7 @@
 # MiniDwarf valid/test split. Every problem is listed exactly once, kept
 # near-balanced between `valid` and `test` as the benchmark grows across
 # versions (v1: 12 problems, 6/6, balanced 3+3 across Structured Grids and
-# N-Body; v2 adds 6 Dense Linear Algebra problems, split 4/5 - see below -
+# N-Body; v2 adds 6 Dense Linear Algebra problems, split 3/3 - see below -
 # for a 9/9 total).
 valid:
   - gauss_blur_2d
