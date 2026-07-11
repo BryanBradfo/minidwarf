@@ -12,9 +12,11 @@ __global__ void gauss_blur(const float* u, float* o, long ny, long nx) {
       1.0f * u[idx + nx - 1] + 2.0f * u[idx + nx]  + 1.0f * u[idx + nx + 1];
   o[idx] = sum / 16.0f;
 }
-extern "C" void minidwarf_solve(const float* const* in, float* const* out, const long* d, int) {
+extern "C" void minidwarf_solve(const void* const* in_, void* const* out_, const long* d, int) {
+  const float* in0 = (const float*)in_[0];
+  float* out0 = (float*)out_[0];
   long ny = d[0], nx = d[1];
   dim3 t(32, 8);
   dim3 g((nx + t.x - 1) / t.x, (ny + t.y - 1) / t.y);
-  gauss_blur<<<g, t>>>(in[0], out[0], ny, nx);
+  gauss_blur<<<g, t>>>(in0, out0, ny, nx);
 }

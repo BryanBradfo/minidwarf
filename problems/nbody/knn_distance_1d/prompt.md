@@ -17,10 +17,14 @@ spatial-index / tree-based nearest-neighbor search.
 ## Kernel ABI
 
 ```c++
-extern "C" void minidwarf_solve(const float* const* inputs,
-                                 float* const* outputs,
+extern "C" void minidwarf_solve(const void* const* inputs,
+                                 void* const* outputs,
                                  const long* dims, int n_dims);
 ```
+
+- Buffers are passed as untyped `void*`; cast each `inputs[k]` you use to
+  `const float*` and `outputs[k]` to `float*` before use (all data here is
+  `float32`).
 
 - `n_dims == 1`, and `dims = [N]`.
 - `inputs[0]` is the flattened position array `pos`, of length `N`.

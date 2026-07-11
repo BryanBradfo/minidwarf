@@ -16,10 +16,12 @@ __global__ void coulomb(const float* pos, float* out, long n) {
   out[i] = (float)acc;
 }
 
-extern "C" void minidwarf_solve(const float* const* inputs, float* const* outputs,
+extern "C" void minidwarf_solve(const void* const* inputs_, void* const* outputs_,
                                  const long* dims, int n_dims) {
+  const float* in0 = (const float*)inputs_[0];
+  float* out0 = (float*)outputs_[0];
   long n = dims[0];
   int threads = 256;
   long blocks = (n + threads - 1) / threads;
-  coulomb<<<(unsigned int)blocks, threads>>>(inputs[0], outputs[0], n);
+  coulomb<<<(unsigned int)blocks, threads>>>(in0, out0, n);
 }

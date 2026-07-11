@@ -13,9 +13,11 @@ __global__ void sobel(const float* u, float* o, long ny, long nx) {
   float gy = -tl - 2.0f * tc - tr + bl + 2.0f * bc + br;
   o[idx] = sqrtf(gx * gx + gy * gy);
 }
-extern "C" void minidwarf_solve(const float* const* in, float* const* out, const long* d, int) {
+extern "C" void minidwarf_solve(const void* const* in_, void* const* out_, const long* d, int) {
+  const float* in0 = (const float*)in_[0];
+  float* out0 = (float*)out_[0];
   long ny = d[0], nx = d[1];
   dim3 t(32, 8);
   dim3 g((nx + t.x - 1) / t.x, (ny + t.y - 1) / t.y);
-  sobel<<<g, t>>>(in[0], out[0], ny, nx);
+  sobel<<<g, t>>>(in0, out0, ny, nx);
 }
