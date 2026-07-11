@@ -5,7 +5,8 @@
 # versions (v1: 12 problems, 6/6, balanced 3+3 across Structured Grids and
 # N-Body; v2 adds 6 Dense Linear Algebra problems, split 3/3, for a 9/9
 # total, then adds the first Sparse Linear Algebra problem, spmv_csr, for a
-# 10/9 total).
+# 10/9 total, then adds 5 more Sparse Linear Algebra problems, split 2/3,
+# for a 12/12 total).
 valid:
   - gauss_blur_2d
   - heat_2d_step
@@ -17,6 +18,8 @@ valid:
   - gemv
   - transpose
   - spmv_csr
+  - spmm_csr
+  - spmv_transpose
 test:
   - laplacian_2d_5pt
   - sobel_2d
@@ -27,3 +30,6 @@ test:
   - gemm_bias
   - syrk
   - scaled_gemm
+  - csr_row_scale
+  - sddmm
+  - jacobi_sparse
