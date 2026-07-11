@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+name: spmv_csr
+dwarf: sparse
+difficulty: hard
+rtol: 1.0e-3
+atol: 1.0e-4
+n_inputs: 4
+n_outputs: 1
+eval_shapes: [[2048, 2048, 20480], [3000, 2000, 24000]]
+baseline: cusparse

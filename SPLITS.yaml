@@ -3,8 +3,9 @@
 # MiniDwarf valid/test split. Every problem is listed exactly once, kept
 # near-balanced between `valid` and `test` as the benchmark grows across
 # versions (v1: 12 problems, 6/6, balanced 3+3 across Structured Grids and
-# N-Body; v2 adds 6 Dense Linear Algebra problems, split 3/3 - see below -
-# for a 9/9 total).
+# N-Body; v2 adds 6 Dense Linear Algebra problems, split 3/3, for a 9/9
+# total, then adds the first Sparse Linear Algebra problem, spmv_csr, for a
+# 10/9 total).
 valid:
   - gauss_blur_2d
   - heat_2d_step
@@ -15,6 +16,7 @@ valid:
   - sgemm
   - gemv
   - transpose
+  - spmv_csr
 test:
   - laplacian_2d_5pt
   - sobel_2d
