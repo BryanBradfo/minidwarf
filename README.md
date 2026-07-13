@@ -102,7 +102,7 @@ the checkout at runtime. Clone the repo and install it editable so the
 `minidwarf` package points back at that checkout:
 
 ```bash
-git clone <this repo>
+git clone https://github.com/BryanBradfo/minidwarf.git
 cd minidwarf
 pip install -e .
 python scripts/check_env.py
