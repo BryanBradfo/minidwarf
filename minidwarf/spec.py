@@ -20,6 +20,7 @@ class Problem:
     baseline: str
 
 def load_problem(root: Path) -> Problem:
+    """Load and validate a problem's spec.yaml from `root`, returning it as a Problem."""
     root = Path(root)
     spec_path = root / "spec.yaml"
     if not spec_path.exists():

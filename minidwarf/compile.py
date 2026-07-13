@@ -7,6 +7,7 @@ DRIVER = Path(__file__).resolve().parents[1] / "harness" / "driver.cu"
 class CompileError(Exception): ...
 
 def compile_binary(candidate_cu: Path, out_dir: Path, arch: str = "sm_120", extra_flags=None) -> Path:
+    """Compile `candidate_cu` together with the harness driver via nvcc, returning the built executable's path."""
     out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
     exe = out_dir / (Path(candidate_cu).stem + ".bin")
     cmd = ["nvcc", f"-arch={arch}", "-O3", "-o", str(exe),

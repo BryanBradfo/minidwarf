@@ -3,6 +3,7 @@ import numpy as np
 
 
 def check_correct(actual, expected, rtol, atol) -> bool:
+    """Return True if every actual output array matches the expected array within rtol/atol."""
     if len(actual) != len(expected):
         return False
     return all(np.allclose(a, e, rtol=rtol, atol=atol, equal_nan=False)

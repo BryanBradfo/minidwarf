@@ -13,6 +13,7 @@ class RunResult:
     outputs: list
 
 def run_binary(exe, inputs, dims, output_shapes, reps=30, timeout_s=60) -> RunResult:
+    """Run a compiled kernel binary on `inputs`, returning its outputs and median device timing over `reps` reps."""
     in_counts = [int(np.prod(a.shape)) for a in inputs]
     out_counts = [int(np.prod(s)) for s in output_shapes]
     with tempfile.TemporaryDirectory() as d:
