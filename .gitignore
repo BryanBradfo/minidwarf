@@ -5,3 +5,5 @@ results/*.tmp
 .venv/
 *.deb
 *.egg-info/
+*.bin
+.pytest_cache/
