@@ -280,6 +280,17 @@ layout and how to add new problems.
   hold against someone who reads the repository itself, since the eval
   shapes and seeds are not secret from a repo-level adversary.
 
+## Citation
+
+If you use MiniDwarf, please cite it -- see [`CITATION.cff`](CITATION.cff) for
+the full, machine-readable citation metadata (Citation File Format v1.2.0).
+Plain-text equivalent:
+
+```
+Chen, Bryan. "MiniDwarf: an HPC-first GPU kernel benchmark for LLMs." 2026.
+https://github.com/BryanBradfo/minidwarf
+```
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).

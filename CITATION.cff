@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use MiniDwarf, please cite it as below."
+title: "MiniDwarf: an HPC-first GPU kernel benchmark for LLMs"
+type: software
+version: "2.0"
+license: Apache-2.0
+repository-code: "https://github.com/BryanBradfo/minidwarf"
+authors:
+  - family-names: "Chen"
+    given-names: "Bryan"
