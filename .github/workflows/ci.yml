@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package and test deps
+        run: |
+          pip install -e .
+          pip install pytest
+
+      # ubuntu-latest has no GPU and no CUDA toolkit, so we can only run the
+      # tests that never invoke nvcc/a CUDA binary: spec/split parsing,
+      # score math, problem I/O, baseline flags, and check_env (which
+      # tolerates a missing nvcc). The compile/run/grade tests
+      # (test_compile.py, test_runner.py, test_grade.py, test_timeout.py,
+      # test_cli.py, test_problem_*.py, ...) require an actual GPU + CUDA
+      # toolkit and are intentionally not run here.
+      - name: Run GPU-less tests
+        run: |
+          python -m pytest tests/test_spec.py tests/test_splits.py tests/test_score.py tests/test_problem_io.py tests/test_baselines.py tests/test_check_env.py -v
