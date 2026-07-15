@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 from minidwarf.extract import extract_kernel
 
 def test_extracts_cuda_fence():
