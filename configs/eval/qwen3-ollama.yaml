@@ -1,0 +1,6 @@
+model_name: qwen3-8b
+base_url: http://localhost:11434/v1
+provider_model_name: qwen3:8b-q4_K_M
+temperature: 0.2
+max_output_tokens: 8192
+n_samples: 1
