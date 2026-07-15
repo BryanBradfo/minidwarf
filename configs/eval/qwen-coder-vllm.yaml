@@ -1,0 +1,6 @@
+model_name: qwen2.5-coder-32b
+base_url: http://localhost:8000/v1
+provider_model_name: Qwen/Qwen2.5-Coder-32B-Instruct
+temperature: 0.2
+max_output_tokens: 4096
+n_samples: 1

@@ -21,11 +21,16 @@ jobs:
 
       # ubuntu-latest has no GPU and no CUDA toolkit, so we can only run the
       # tests that never invoke nvcc/a CUDA binary: spec/split parsing,
-      # score math, problem I/O, baseline flags, and check_env (which
-      # tolerates a missing nvcc). The compile/run/grade tests
+      # score math, problem I/O, baseline flags, check_env (which
+      # tolerates a missing nvcc), and the eval-harness config/model/
+      # generation/leaderboard tests (kernel extraction, EvalConfig
+      # loading, the Model ABC + registry + DummyModel, the OpenAI-compatible
+      # adapter's request shaping, the dummy-provider generation loop, and
+      # leaderboard aggregation). The compile/run/grade tests
       # (test_compile.py, test_runner.py, test_grade.py, test_timeout.py,
-      # test_cli.py, test_problem_*.py, ...) require an actual GPU + CUDA
-      # toolkit and are intentionally not run here.
+      # test_cli.py, test_problem_*.py, test_evaluate.py, test_cli_eval.py,
+      # ...) require an actual GPU + CUDA toolkit and are intentionally not
+      # run here.
       - name: Run GPU-less tests
         run: |
-          python -m pytest tests/test_spec.py tests/test_splits.py tests/test_score.py tests/test_problem_io.py tests/test_baselines.py tests/test_check_env.py -v
+          python -m pytest tests/test_spec.py tests/test_splits.py tests/test_score.py tests/test_problem_io.py tests/test_baselines.py tests/test_check_env.py tests/test_extract.py tests/test_evalconfig.py tests/test_models.py tests/test_openai_compat.py tests/test_generate.py tests/test_leaderboard.py -v
