@@ -1,0 +1,4 @@
+model_name: dummy-model
+base_url: http://localhost:0/v1
+provider_model_name: dummy
+provider: dummy

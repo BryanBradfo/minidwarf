@@ -1,0 +1,7 @@
+model_name: gemini-2.5-flash
+base_url: https://generativelanguage.googleapis.com/v1beta/openai/
+provider_model_name: gemini-2.5-flash
+api_key_env_var: GEMINI_API_KEY
+temperature: 0.2
+max_output_tokens: 4096
+n_samples: 1

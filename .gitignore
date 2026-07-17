@@ -8,3 +8,4 @@ results/*.tmp
 *.bin
 .pytest_cache/
 .superpowers/
+runs/

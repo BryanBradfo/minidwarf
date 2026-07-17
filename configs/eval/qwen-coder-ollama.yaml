@@ -1,0 +1,6 @@
+model_name: qwen2.5-coder-7b
+base_url: http://localhost:11434/v1
+provider_model_name: qwen2.5-coder:7b
+temperature: 0.2
+max_output_tokens: 4096
+n_samples: 1

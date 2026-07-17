@@ -135,6 +135,30 @@ To get the exact prompt text a model should see for a given problem
 python scripts/gen_prompt.py problems/structured_grids/jacobi_3d_7pt
 ```
 
+### Evaluating an LLM end-to-end
+
+To run a model against a whole split and score it automatically, describe the
+model with a small YAML config (one per model) and run `minidwarf eval`. The
+model backend is any OpenAI-compatible endpoint, so **Ollama**, **vLLM**, and
+hosted APIs (e.g. Gemini's OpenAI-compatible endpoint) all work by swapping
+`base_url` / `provider_model_name` / `api_key_env_var` -- see the ready-made
+examples in [`configs/eval/`](configs/eval) (`qwen-coder-ollama.yaml`,
+`qwen-coder-vllm.yaml`, `gemini-flash.yaml`). Local servers need no API key.
+
+```bash
+# generate a kernel per problem, then grade every one (writes runs/<id>/)
+minidwarf eval --config configs/eval/qwen-coder-ollama.yaml --split valid
+
+# aggregate every run under runs/ into the leaderboard
+minidwarf leaderboard --runs-dir runs --out LEADERBOARD.md
+```
+
+`eval` splits into generation (prompt the model, extract its ``` ```cuda ``` block,
+save the kernel + raw response under `runs/<run_id>/`) and scoring (grade each
+kernel with the same pipeline as `minidwarf run`), so re-scoring never re-runs
+the model. Set `n_samples` in the config for pass@k (the leaderboard reports
+best-of-n). `runs/` is gitignored; commit only the generated `LEADERBOARD.md`.
+
 ## Grading pipeline
 
 Each submitted kernel goes through the same four stages:
