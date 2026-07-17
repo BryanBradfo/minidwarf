@@ -34,5 +34,6 @@ jobs:
       - name: Run GPU-less tests
         run: |
           python -m pytest tests/test_spec.py tests/test_splits.py tests/test_score.py tests/test_problem_io.py tests/test_baselines.py tests/test_check_env.py tests/test_extract.py tests/test_evalconfig.py tests/test_models.py tests/test_openai_compat.py tests/test_generate.py tests/test_leaderboard.py -v
-          # best_result selection is pure/GPU-less; the rest of test_evaluate.py is nvcc-gated
-          python -m pytest tests/test_evaluate.py -k best_result -v
+          # test_evaluate.py: the best_result unit tests run here; its one
+          # nvcc-gated e2e test skips automatically when no CUDA toolkit is present.
+          python -m pytest tests/test_evaluate.py -v
