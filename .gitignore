@@ -9,3 +9,5 @@ results/*.tmp
 .pytest_cache/
 .superpowers/
 runs/
+CLAUDE.md
+.claude.local.md
