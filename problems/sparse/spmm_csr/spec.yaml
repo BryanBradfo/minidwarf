@@ -7,4 +7,5 @@ atol: 1.0e-3
 n_inputs: 4
 n_outputs: 1
 eval_shapes: [[1024, 1024, 10240, 16], [1500, 800, 12000, 12]]
+check_shapes: [[1, 1, 1, 1], [37, 29, 20, 3], [129, 67, 1000, 33]]
 baseline: cusparse

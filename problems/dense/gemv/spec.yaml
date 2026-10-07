@@ -6,4 +6,5 @@ atol: 1.0e-3
 n_inputs: 2
 n_outputs: 1
 eval_shapes: [[1024, 1024], [1500, 700]]
+check_shapes: [[1, 1], [33, 65], [131, 7]]
 baseline: cublas

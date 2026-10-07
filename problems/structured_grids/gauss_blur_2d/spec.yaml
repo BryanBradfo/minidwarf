@@ -6,4 +6,5 @@ atol: 1.0e-5
 n_inputs: 1
 n_outputs: 1
 eval_shapes: [[512, 512], [640, 384]]
+check_shapes: [[3, 3], [33, 17], [131, 97]]
 baseline: author_kernel
