@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-import functools, re, subprocess, tempfile
+import functools, re, subprocess, tempfile, warnings
 from pathlib import Path
 from .lint import lint_symbols, lint_defined
 
@@ -51,13 +51,9 @@ def _nm(args, obj) -> list[str]:
         raise CompileError(r.stderr)
     return [ln.split()[-1] for ln in r.stdout.splitlines() if ln.split()]
 
-def undefined_symbols(obj: Path, *_, **__) -> list[str]:
-    """Undefined symbols of a compiled object (`nm -u`). A `.cu` path is compiled first (legacy form)."""
-    obj = Path(obj)
-    if obj.suffix == ".cu":
-        d = Path(_[0]) if _ else Path(__.get("out_dir"))
-        obj = compile_object(obj, d, __.get("arch", "sm_120"))
-    return _nm(["-u"], obj)
+def undefined_symbols(obj: Path) -> list[str]:
+    """Undefined symbols of a compiled object (`nm -u`)."""
+    return _nm(["-u"], Path(obj))
 
 def defined_symbols(obj: Path) -> list[str]:
     return _nm(["-g", "--defined-only"], obj)
@@ -68,14 +64,19 @@ def _forbidden_defined() -> frozenset:
         r = _run(["nvcc", "-arch=sm_120", *NVCC_FLAGS, "-c", str(DRIVER), "-o", str(Path(d) / "driver.o")])
         if r.returncode != 0:
             raise CompileError(r.stderr)
-        names = set(_nm(["-u"], Path(d) / "driver.o"))
+        drv = Path(d) / "driver.o"
+        # the driver's own globals (incl. weak template code) must not be replaced by candidate strong symbols
+        names = set(_nm(["-u"], drv)) | {n for n in _nm(["-g", "--defined-only"], drv)
+                                         if n != "minidwarf_solve" and not n.startswith("DW.ref.")}
     try:  # libc exports; skipped when the library cannot be resolved to a real file
         g = _run(["gcc", "-print-file-name=libc.so.6"], 30).stdout.strip()
         libc = Path(g).resolve() if g else None
         if libc and libc.is_file():
             names |= set(_nm(["-D", "--defined-only"], libc))
+        else:
+            warnings.warn("libc not resolved: libc-export interposition check skipped")
     except (OSError, CompileError, subprocess.TimeoutExpired):
-        pass
+        warnings.warn("libc export list unavailable: libc-export interposition check skipped")
     return frozenset(names)
 
 _ASM = re.compile(r"^\s*[0-9a-f]+:\s+(syscall|sysenter|int\s+\$0x80)\b", re.M)

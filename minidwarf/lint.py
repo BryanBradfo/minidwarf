@@ -41,7 +41,7 @@ def lint_source(src: str, allowed_libs=()) -> list[str]:
 
 _BAN_EXACT = frozenset("""fopen fopen64 freopen fread open open64 openat openat64 creat read pread pread64 mmap mmap64
 system popen fork vfork execl execlp execle execv execvp execvpe execve fexecve posix_spawn posix_spawnp syscall
-dlopen dlsym dlmopen dlvsym getenv secure_getenv exit _exit _Exit quick_exit pthread_create cudaSetDevice cudaDeviceReset
+dlopen dlsym dlmopen dlvsym getenv secure_getenv exit _exit _Exit quick_exit pthread_create mprotect pkey_mprotect cudaSetDevice cudaDeviceReset
 environ __environ freopen64 fdopen clone __clone posix_spawn_file_actions_addopen __open_2 __open64_2 __openat_2
 __openat64_2 __read_chk __pread_chk __pread64_chk __fread_chk __fread_unlocked_chk fread_unlocked""".split())
 _BAN_SUB = ("_M_start_thread", "basic_ifstream", "basic_ofstream", "basic_fstream", "basic_filebuf")
@@ -52,7 +52,7 @@ def lint_symbols(names, allowed_libs=()) -> list[str]:
     return sorted(f"symbol:{n}" for n in set(names)
                   if n in _BAN_EXACT or n.startswith(prefixes) or any(b in n for b in _BAN_SUB))
 
-_RESERVED = re.compile(r"^(cuda|cu[A-Z]|__cuda)")
+_RESERVED = re.compile(r"^(cuda|cu[A-Z]|__cuda|libcudart_static_)")
 
 def lint_defined(names, forbidden) -> list[str]:
     """Sorted `defines:<name>` entries for candidate-defined symbols that would interpose the driver/runtime/libc."""

@@ -76,3 +76,8 @@ def test_lint_defined():
     from minidwarf.lint import lint_defined
     got = lint_defined(["minidwarf_solve", "cudaEventElapsedTime", "_Z4vaddPf", "fwrite", "__cudaFoo", "cuInit", "cube"], {"fwrite"})
     assert got == sorted(["defines:cudaEventElapsedTime", "defines:fwrite", "defines:__cudaFoo", "defines:cuInit"])
+
+def test_mprotect_and_reserved_prefixes():
+    from minidwarf.lint import lint_defined
+    assert lint_symbols(["mprotect", "pkey_mprotect"]) == ["symbol:mprotect", "symbol:pkey_mprotect"]
+    assert lint_defined(["libcudart_static_abc", "__cudart1"], set()) == ["defines:__cudart1", "defines:libcudart_static_abc"]

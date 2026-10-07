@@ -78,3 +78,9 @@ def test_non_utf8_syntax_error_is_compile_error(tmp_path):
 def test_non_utf8_stderr_does_not_raise(tmp_path):
     r = _hits(tmp_path, '#include <cstdio>\nstatic int s = (fprintf(stderr, "\\xff\\xfe"), 1);\n' + _entry(""))
     assert r.status == "ok"
+
+def test_std_shuffle_specialization_caught(tmp_path):
+    r = _hits(tmp_path, '#include <algorithm>\n#include <random>\n#include <vector>\nnamespace std {\n'
+              'template<> void shuffle<__gnu_cxx::__normal_iterator<int*, vector<int>>, mt19937&>('
+              '__gnu_cxx::__normal_iterator<int*, vector<int>>, __gnu_cxx::__normal_iterator<int*, vector<int>>, mt19937&) {}\n}\n' + _entry(""))
+    assert r.status == "forbidden_api" and any(h.startswith("defines:_ZSt7shuffle") for h in r.lint), r.lint
