@@ -84,3 +84,12 @@ def test_std_shuffle_specialization_caught(tmp_path):
               'template<> void shuffle<__gnu_cxx::__normal_iterator<int*, vector<int>>, mt19937&>('
               '__gnu_cxx::__normal_iterator<int*, vector<int>>, __gnu_cxx::__normal_iterator<int*, vector<int>>, mt19937&) {}\n}\n' + _entry(""))
     assert r.status == "forbidden_api" and any(h.startswith("defines:_ZSt7shuffle") for h in r.lint), r.lint
+
+def test_benign_stl_use_has_no_hits(tmp_path):
+    k = tmp_path / "k.cu"
+    k.write_text('#include <algorithm>\n#include <random>\n#include <vector>\n' + _entry(
+        'std::vector<float> f; std::vector<int> v; std::vector<long> l; std::mt19937 g(1);\n'
+        'for(int i=0;i<10;i++){ f.push_back((float)i); v.push_back((int)(g()%100)); l.push_back(i); }\n'
+        'std::sort(v.begin(), v.end()); std::sort(f.begin(), f.end()); std::sort(l.begin(), l.end());\n'
+        'if(f.size()>100) return;\n'))
+    assert object_hits(compile_object(k, tmp_path / "o")) == []

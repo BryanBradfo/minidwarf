@@ -54,7 +54,9 @@ def lint_symbols(names, allowed_libs=()) -> list[str]:
 
 _RESERVED = re.compile(r"^(cuda|cu[A-Z]|__cuda|libcudart_static_)")
 
-def lint_defined(names, forbidden) -> list[str]:
-    """Sorted `defines:<name>` entries for candidate-defined symbols that would interpose the driver/runtime/libc."""
-    return sorted(f"defines:{n}" for n in set(names)
-                  if n != "minidwarf_solve" and (n in forbidden or _RESERVED.match(n)))
+def lint_defined(symbols, forbidden, forbidden_strong=()) -> list[str]:
+    """Sorted `defines:<name>` for candidate-defined (name, nm_type) globals that would interpose driver/runtime/libc.
+    A driver-defined name (`forbidden_strong`) is tolerated only as exactly weak/comdat (nm W or V): those duplicates
+    lose to the driver's copy because the driver is linked first. Any IFUNC/unique/absolute global is rejected."""
+    return sorted({f"defines:{n}" for n, t in symbols if n != "minidwarf_solve" and (
+        n in forbidden or _RESERVED.match(n) or t in "iuA" or (n in forbidden_strong and t not in ("W", "V")))})

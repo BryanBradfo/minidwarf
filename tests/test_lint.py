@@ -74,10 +74,30 @@ def test_extra_banned_symbols():
 
 def test_lint_defined():
     from minidwarf.lint import lint_defined
-    got = lint_defined(["minidwarf_solve", "cudaEventElapsedTime", "_Z4vaddPf", "fwrite", "__cudaFoo", "cuInit", "cube"], {"fwrite"})
+    got = lint_defined([(n, "T") for n in ["minidwarf_solve", "cudaEventElapsedTime", "_Z4vaddPf", "fwrite", "__cudaFoo", "cuInit", "cube"]], {"fwrite"})
     assert got == sorted(["defines:cudaEventElapsedTime", "defines:fwrite", "defines:__cudaFoo", "defines:cuInit"])
 
 def test_mprotect_and_reserved_prefixes():
     from minidwarf.lint import lint_defined
     assert lint_symbols(["mprotect", "pkey_mprotect"]) == ["symbol:mprotect", "symbol:pkey_mprotect"]
-    assert lint_defined(["libcudart_static_abc", "__cudart1"], set()) == ["defines:__cudart1", "defines:libcudart_static_abc"]
+    assert lint_defined([("libcudart_static_abc", "T"), ("__cudart1", "T")], set()) == ["defines:__cudart1", "defines:libcudart_static_abc"]
+
+def test_driver_names_forbidden_only_when_strong():
+    from minidwarf.lint import lint_defined
+    syms = [("_ZSt7shuffle", "T"), ("_ZNSt6vectorIfED2Ev", "W"), ("_ZNSt6vectorIlED2Ev", "V"), ("_ZSt4sort", "D")]
+    drv = {"_ZSt7shuffle", "_ZNSt6vectorIfED2Ev", "_ZNSt6vectorIlED2Ev"}
+    assert lint_defined(syms, set(), drv) == ["defines:_ZSt7shuffle"]
+    assert lint_defined([("fwrite", "W")], {"fwrite"}) == ["defines:fwrite"]  # always-forbidden applies to weak too
+
+def test_link_puts_driver_before_candidate_object():
+    from minidwarf.compile import _link_cmd, DRIVER
+    cmd = _link_cmd("c.o", "x.bin", "sm_120", ["-lm"])
+    assert cmd.index(str(DRIVER)) < cmd.index("c.o") and cmd[-1] == "-lm"
+
+def test_lint_defined_type_allowlist():
+    from minidwarf.lint import lint_defined
+    drv = {"_ZdrvW", "_ZdrvV", "_ZdrvT", "_ZdrvI"}
+    syms = [("_ZdrvW", "W"), ("_ZdrvV", "V"), ("_ZdrvT", "T"), ("_ZdrvI", "i"), ("other", "i"), ("_Z6kernelPf", "T"),
+            ("abs_sym", "A"), ("uniq", "u")]
+    assert lint_defined(syms, set(), drv) == sorted(["defines:_ZdrvT", "defines:_ZdrvI", "defines:other",
+                                                    "defines:abs_sym", "defines:uniq"])

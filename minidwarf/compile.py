@@ -33,14 +33,16 @@ def compile_object(candidate_cu: Path, out_dir: Path, arch: str = "sm_120") -> P
         raise CompileError(r.stderr)
     return obj
 
+def _link_cmd(obj, exe, arch, extra_flags=None) -> list[str]:
+    # The driver MUST precede the candidate object: weak/comdat duplicates resolve to the first definition,
+    # so the driver's own template instantiations win (see lint_defined).
+    return ["nvcc", f"-arch={arch}", *NVCC_FLAGS, "-o", str(exe), str(DRIVER), str(obj), *(extra_flags or [])]
+
 def link_binary(obj: Path, out_dir: Path, arch: str = "sm_120", extra_flags=None) -> Path:
     """Link a checked candidate object with the harness driver."""
     out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
     exe = out_dir / (Path(obj).stem + ".bin")
-    cmd = ["nvcc", f"-arch={arch}", *NVCC_FLAGS, "-o", str(exe), str(DRIVER), str(obj)]
-    if extra_flags:
-        cmd += list(extra_flags)
-    r = _run(cmd)
+    r = _run(_link_cmd(obj, exe, arch, extra_flags))
     if r.returncode != 0:
         raise CompileError(r.stderr)
     return exe
@@ -55,19 +57,27 @@ def undefined_symbols(obj: Path) -> list[str]:
     """Undefined symbols of a compiled object (`nm -u`)."""
     return _nm(["-u"], Path(obj))
 
-def defined_symbols(obj: Path) -> list[str]:
-    return _nm(["-g", "--defined-only"], obj)
+def _nm_typed(args, obj) -> list[tuple[str, str]]:
+    r = _run(["nm", *args, str(obj)], 60)
+    if r.returncode != 0:
+        raise CompileError(r.stderr)
+    return [(f[-1], f[-2]) for f in (ln.split() for ln in r.stdout.splitlines()) if len(f) >= 2]
+
+def defined_symbols(obj: Path) -> list[tuple[str, str]]:
+    """(name, nm type) of an object's defined globals."""
+    return _nm_typed(["-g", "--defined-only"], obj)
 
 @functools.lru_cache(maxsize=None)
-def _forbidden_defined() -> frozenset:
+def _forbidden_defined() -> tuple[frozenset, frozenset]:
+    """(names forbidden at any strength, driver-defined names forbidden only as strong definitions)."""
     with tempfile.TemporaryDirectory() as d:
         r = _run(["nvcc", "-arch=sm_120", *NVCC_FLAGS, "-c", str(DRIVER), "-o", str(Path(d) / "driver.o")])
         if r.returncode != 0:
             raise CompileError(r.stderr)
         drv = Path(d) / "driver.o"
         # the driver's own globals (incl. weak template code) must not be replaced by candidate strong symbols
-        names = set(_nm(["-u"], drv)) | {n for n in _nm(["-g", "--defined-only"], drv)
-                                         if n != "minidwarf_solve" and not n.startswith("DW.ref.")}
+        names = set(_nm(["-u"], drv))
+        strong = {n for n, _ in defined_symbols(drv) if n != "minidwarf_solve" and not n.startswith("DW.ref.")}
     try:  # libc exports; skipped when the library cannot be resolved to a real file
         g = _run(["gcc", "-print-file-name=libc.so.6"], 30).stdout.strip()
         libc = Path(g).resolve() if g else None
@@ -77,7 +87,7 @@ def _forbidden_defined() -> frozenset:
             warnings.warn("libc not resolved: libc-export interposition check skipped")
     except (OSError, CompileError, subprocess.TimeoutExpired):
         warnings.warn("libc export list unavailable: libc-export interposition check skipped")
-    return frozenset(names)
+    return frozenset(names), frozenset(strong)
 
 _ASM = re.compile(r"^\s*[0-9a-f]+:\s+(syscall|sysenter|int\s+\$0x80)\b", re.M)
 
@@ -90,4 +100,4 @@ def asm_hits(obj: Path) -> list[str]:
 def object_hits(obj: Path, allowed_libs=()) -> list[str]:
     """All object-level policy hits (undefined symbols, interposing definitions, inline syscalls), sorted."""
     return sorted(set(lint_symbols(undefined_symbols(obj), allowed_libs)
-                      + lint_defined(defined_symbols(obj), _forbidden_defined()) + asm_hits(obj)))
+                      + lint_defined(defined_symbols(obj), *_forbidden_defined()) + asm_hits(obj)))
