@@ -29,3 +29,18 @@ def test_allowed_lib_not_flagged():
     src = "#include <curand_kernel.h>\n"
     assert lint_source(src) == ["curand"]
     assert lint_source(src, allowed_libs=["curand"]) == []
+
+def test_double_slash_in_string_does_not_hide_call():
+    assert lint_source('const char* s="//"; FILE*f=fopen("x","r");') == ["file_io"]
+
+def test_block_comment_markers_in_strings_do_not_hide_call():
+    assert lint_source('const char* a="/*"; fopen("x","r"); const char* b="*/";') == ["file_io"]
+
+def test_char_literal_quote_does_not_hide_call():
+    assert lint_source("char c='\"'; fopen(\"x\",\"r\"); char d='\"';") == ["file_io"]
+
+def test_execve_flagged():
+    assert lint_source('void f(){ execve("/bin/sh", 0, 0); }') == ["process"]
+
+def test_quoted_thrust_include_flagged():
+    assert lint_source('#include "thrust/sort.h"\n') == ["thrust"]
