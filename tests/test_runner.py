@@ -79,3 +79,9 @@ def test_mismatched_set_shapes_rejected(tmp_path):
     exe = compile_binary(FIX / "solutions/expert_v1.cu", tmp_path)
     with pytest.raises(ValueError):
         run_binary(exe, _sets(16, 1) + _sets(32, 1), [16], [(16,)], reps=4)
+
+def test_expected_sets_mismatch_rejected(tmp_path):
+    exe = compile_binary(FIX / "solutions/expert_v1.cu", tmp_path); sets = _sets(16, 4)
+    exp = _exp(sets)
+    with pytest.raises(ValueError): run_binary(exe, sets, [16], [(16,)], reps=4, expected_sets=exp[:3])
+    with pytest.raises(ValueError): run_binary(exe, sets, [16], [(16,)], reps=4, expected_sets=[[np.zeros(8, np.float32)] for _ in sets])

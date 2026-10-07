@@ -53,3 +53,17 @@ def test_prefixed_char_literal_does_not_hide_call():
 
 def test_raw_string_flagged():
     assert lint_source('const char* s = R"(x)";') == ["raw_string"]
+
+from minidwarf.lint import lint_symbols
+
+def test_constructor_attribute_flagged():
+    assert lint_source("__attribute__((constructor)) void f(){}") == ["constructor"]
+    assert lint_source("[[gnu::constructor]] void f(){}") == ["constructor"]
+    assert lint_source("// __attribute__((constructor))\nvoid f(){}") == []
+
+def test_lint_symbols_policy():
+    mangled = "_ZNSt6thread15_M_start_threadESt10unique_ptrINS_6_StateESt14default_deleteIS1_EEPFvvE"
+    got = lint_symbols(["cudaMalloc", "atexit", "fopen", "cublasCreate_v2", mangled])
+    assert got == sorted(["symbol:fopen", "symbol:cublasCreate_v2", "symbol:" + mangled])
+    assert lint_symbols(["curand_init"], ["curand"]) == []
+    assert lint_symbols(["curand_init"]) == ["symbol:curand_init"]

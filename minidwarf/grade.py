@@ -1,14 +1,19 @@
 # SPDX-License-Identifier: Apache-2.0
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 import numpy as np
 from .spec import load_problem
-from .problem_io import load_module_fn
-from .compile import compile_binary, CompileError
-from .baselines import link_flags
-from .runner import run_binary, RunError, RunResult
-from .correctness import check_correct
+from .compile import compile_binary, undefined_symbols, CompileError
+from .baselines import link_flags, lib_flags
+from .lint import lint_source, lint_symbols
+from .refcache import cached_case
+from .runner import run_binary, RunError
+from .correctness import compare
+from .score import geomean_speedup
+
+N_SETS = 4
+CHECK_SEED_OFFSET = 500_000
 
 @dataclass
 class ProblemResult:
@@ -17,48 +22,79 @@ class ProblemResult:
     status: str
     correct: bool
     speedup: float | None
+    checks: list = field(default_factory=list)
+    timings: list = field(default_factory=list)
+    lint: list = field(default_factory=list)
+    bad_calls: int = 0
 
-def grade_problem(problem_root, candidate_cu, work_dir, seed=12345, reps=30, timeout_s=60) -> ProblemResult:
-    """Compile, run, and score a single candidate ``.cu`` file against a problem.
+def _cases(root, shape, seed0):
+    cases = [cached_case(root, shape, seed0 + d) for d in range(N_SETS)]
+    return [c[0] for c in cases], [c[1] for c in cases]
 
-    Runs the four-stage pipeline (compile, correctness, anti-gaming via
-    eval_shapes, timing) and returns a ``ProblemResult`` whose ``status`` is
-    one of ``"ok"``, ``"wrong_output"``, ``"compile_error"``,
-    ``"runtime_error"``, or ``"timeout"`` (a hung candidate/baseline binary
-    that exceeds ``timeout_s``) -- it never raises for a misbehaving
-    candidate, so a single bad kernel cannot abort a `minidwarf suite` run.
-    """
+def _checks(run, expected_sets, shape, p, kind):
+    return [{"kind": kind, "shape": list(shape), "data_set": d, **compare(outs, exp, p.rtol, p.atol)}
+            for d, (outs, exp) in enumerate(zip(run.outputs, expected_sets))]
+
+def _iqr(t):
+    q25, q75 = np.percentile(t, [25, 75]); return float(q75 - q25)
+
+def grade_problem(problem_root, candidate_cu, work_dir, seed=12345, reps=20, warmup=3,
+                  timeout_s=60, trusted=False) -> ProblemResult:
+    """Lint, compile, check and time one candidate against a problem (harness v3).
+
+    Status is one of "ok", "wrong_output", "compile_error", "runtime_error", "timeout" or
+    "forbidden_api"; a misbehaving candidate never raises. `trusted=True` skips the lints and links
+    the candidate like the baseline (used to grade baseline.cu against itself). Every candidate call is
+    verified by the driver; any bad call makes the candidate incorrect."""
     p = load_problem(problem_root)
-    gen = load_module_fn(p.root, "inputs.py", "generate")
-    ref = load_module_fn(p.root, "reference.py", "run")
     work_dir = Path(work_dir)
+    fail = lambda status, **kw: ProblemResult(p.name, p.dwarf, status, False, None, **kw)
+    if not trusted:
+        hits = lint_source(Path(candidate_cu).read_bytes().decode(errors="replace"), p.allowed_libs)
+        if hits: return fail("forbidden_api", lint=hits)
+        try:  # symbol-level check closes macro/##/raw-string bypasses of the regex lint (fail-closed)
+            hits = lint_symbols(undefined_symbols(Path(candidate_cu), work_dir / "symcheck"), p.allowed_libs)
+        except (CompileError, subprocess.TimeoutExpired):
+            return fail("compile_error")
+        if hits: return fail("forbidden_api", lint=hits)
     try:
-        flags = link_flags(p.baseline)
-        cand_exe = compile_binary(Path(candidate_cu), work_dir / "cand", extra_flags=flags)
-        base_exe = compile_binary(p.root / "baseline.cu", work_dir / "base", extra_flags=flags)
-    except CompileError:
-        return ProblemResult(p.name, p.dwarf, "compile_error", False, None)
-    except subprocess.TimeoutExpired:
-        return ProblemResult(p.name, p.dwarf, "compile_error", False, None)
+        base_flags = link_flags(p.baseline)
+        cand_exe = compile_binary(Path(candidate_cu), work_dir / "cand",
+                                  extra_flags=base_flags if trusted else lib_flags(p.allowed_libs))
+        base_exe = compile_binary(p.root / "baseline.cu", work_dir / "base", extra_flags=base_flags)
+    except (CompileError, subprocess.TimeoutExpired):
+        return fail("compile_error")
 
-    correct = True
-    cand_ms_sum = base_ms_sum = 0.0
+    checks, timings, bad = [], [], 0
+    def cand(ins, exp, shape, shapes, n_reps, n_warm):
+        nonlocal bad
+        r = run_binary(cand_exe, ins, shape, shapes, n_reps, n_warm, timeout_s,
+                       expected_sets=exp, rtol=p.rtol, atol=p.atol)
+        if r.n_bad_calls is None: raise RunError("driver did not report n_bad_calls")
+        bad += r.n_bad_calls
+        return r
     try:
+        for i, shape in enumerate(p.check_shapes):
+            ins, exp = _cases(p.root, shape, seed + CHECK_SEED_OFFSET + 1000 * i)
+            shapes = [e.shape for e in exp[0]]
+            checks += _checks(cand(ins, exp, shape, shapes, N_SETS, 0), exp, shape, p, "check")
         for i, shape in enumerate(p.eval_shapes):
-            ins = gen(shape, seed + i)
-            expected = ref(ins, shape)
-            output_shapes = [np.asarray(e).shape for e in expected]
-            cr: RunResult = run_binary(cand_exe, [ins], shape, output_shapes, reps, warmup=3, timeout_s=timeout_s)
-            if not check_correct(cr.outputs[0], expected, p.rtol, p.atol):
-                correct = False
-            br: RunResult = run_binary(base_exe, [ins], shape, output_shapes, reps, warmup=3, timeout_s=timeout_s)
-            cand_ms_sum += cr.median_ms
-            base_ms_sum += br.median_ms
+            ins, exp = _cases(p.root, shape, seed + 1000 * i)
+            shapes = [e.shape for e in exp[0]]
+            c1 = cand(ins, exp, shape, shapes, reps, warmup)  # ABBA order
+            b1 = run_binary(base_exe, ins, shape, shapes, reps, warmup, timeout_s)
+            b2 = run_binary(base_exe, ins, shape, shapes, reps, warmup, timeout_s)
+            c2 = cand(ins, exp, shape, shapes, reps, warmup)
+            checks += _checks(c1, exp, shape, p, "eval") + _checks(c2, exp, shape, p, "eval")
+            ct, bt = c1.times_ms + c2.times_ms, b1.times_ms + b2.times_ms
+            timings.append({"shape": list(shape), "cand_median_ms": float(np.median(ct)), "cand_iqr_ms": _iqr(ct),
+                            "base_median_ms": float(np.median(bt)), "base_iqr_ms": _iqr(bt)})
     except RunError:
-        return ProblemResult(p.name, p.dwarf, "runtime_error", False, None)
+        return fail("runtime_error", checks=checks, timings=timings, bad_calls=bad)
     except subprocess.TimeoutExpired:
-        return ProblemResult(p.name, p.dwarf, "timeout", False, None)
+        return fail("timeout", checks=checks, timings=timings, bad_calls=bad)
 
-    status = "ok" if correct else "wrong_output"
-    speedup = (base_ms_sum / cand_ms_sum) if cand_ms_sum > 0 else None
-    return ProblemResult(p.name, p.dwarf, status, correct, speedup)
+    correct = all(c["passed"] for c in checks) and bad == 0
+    speedup = geomean_speedup([t["base_median_ms"] for t in timings], [t["cand_median_ms"] for t in timings])
+    return ProblemResult(p.name, p.dwarf, "ok" if correct else "wrong_output", correct, speedup, checks, timings,
+                         bad_calls=bad)

@@ -27,6 +27,9 @@ def run_binary(exe, input_sets, dims, output_shapes, reps=20, warmup=3, timeout_
         raise ValueError(f"need reps >= n_sets >= 1, got reps={reps}, n_sets={n_sets}")
     if any([a.shape for a in s] != [a.shape for a in input_sets[0]] for s in input_sets):
         raise ValueError("all input sets must have the same shapes")
+    if expected_sets is not None and (len(expected_sets) != n_sets or any(
+            [np.shape(a) for a in e] != [tuple(s) for s in output_shapes] for e in expected_sets)):
+        raise ValueError("expected_sets must have one entry per input set, matching output_shapes")
     in_counts = [int(np.prod(a.shape)) for a in input_sets[0]]
     out_counts = [int(np.prod(s)) for s in output_shapes]
     with tempfile.TemporaryDirectory() as d:

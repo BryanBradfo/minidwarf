@@ -10,6 +10,7 @@ _ALWAYS = {
     "process": r"\b(system|popen|fork|exec\w*)\s*\(",
     "dynamic_loading": r"\b(dlopen|dlsym)\s*\(",
     "environment": r"\bgetenv\s*\(",
+    "constructor": r"__attribute__\s*\(\(\s*constructor|\[\[\s*gnu::constructor",
 }
 # One pass so a comment marker inside a literal (or a quote inside a char literal) cannot mask code.
 _TOKEN = re.compile(r'"(?:\\.|[^"\\\n])*"|(?<![\w])(?:u8|u|U|L)?\'(?:\\.|[^\'\\\n])*\'|//[^\n]*|/\*.*?\*/', re.S)
@@ -37,3 +38,14 @@ def lint_source(src: str, allowed_libs=()) -> list[str]:
     if _RAW.search(src):
         hits.append("raw_string")
     return sorted(hits)
+
+_BAN_EXACT = frozenset("""fopen fopen64 freopen fread open open64 openat openat64 creat read pread pread64 mmap mmap64
+system popen fork vfork execl execlp execle execv execvp execvpe execve fexecve posix_spawn posix_spawnp syscall
+dlopen dlsym dlmopen getenv secure_getenv exit _exit _Exit quick_exit pthread_create cudaSetDevice cudaDeviceReset""".split())
+_BAN_SUB = ("_M_start_thread", "basic_ifstream", "basic_ofstream", "basic_fstream", "basic_filebuf")
+
+def lint_symbols(names, allowed_libs=()) -> list[str]:
+    """Policy over a compiled candidate's undefined symbols: sorted `symbol:<name>` entries for banned ones."""
+    prefixes = tuple(k for k in _LIBS if k not in set(allowed_libs))
+    return sorted(f"symbol:{n}" for n in set(names)
+                  if n in _BAN_EXACT or n.startswith(prefixes) or any(b in n for b in _BAN_SUB))
