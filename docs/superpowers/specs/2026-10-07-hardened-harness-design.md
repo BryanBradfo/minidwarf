@@ -80,8 +80,8 @@ and string literals; it is a tripwire, not a sandbox, and the paper says so.
 - **Noise floor:** `scripts/noise_floor.py` runs an A/A test (baseline vs
   itself, ABBA) over all problems and writes ε (95th percentile of
   |log speedup|) to `harness/noise_floor.json`. Reported speedups keep their
-  raw value; the leaderboard counts a speedup as a win only if
-  `> 1 + ε`.
+  raw value; the leaderboard's `fast_p@p` counts a problem only if
+  `speedup ≥ p · (1 + ε)`.
 - **GPU preflight:** before any timing, the grader queries
   `nvidia-smi --query-compute-apps` and refuses to time (status
   `gpu_busy`, raised as an error for the whole run, not scored as a candidate
@@ -100,13 +100,28 @@ and string literals; it is a tripwire, not a sandbox, and the paper says so.
   candidate is `correct` only if it passes all eval shapes × all D data sets
   and all check shapes. For the existing 24 problems, check shapes are added
   in this sub-project.
-- **Calibrated tolerances:** `scripts/calibrate_tol.py` measures the max
-  abs/rel error of a naive float32 evaluation of `reference.py` against the
-  float64 reference over eval and check shapes. A test asserts each
-  `spec.yaml` tolerance lies within [1×, 100×] of that error.
+- **Calibrated tolerances:** the expert kernel (`solutions/expert_v1.cu`) is
+  the problem's canonical float32 implementation. `scripts/calibrate_tol.py`
+  grades it and records its normalized error
+  `tol_ratio = max |a - e| / (atol + rtol·|e|)` over all checks. A test
+  asserts `0.01 ≤ tol_ratio ≤ 1` for every problem, i.e. the tolerance is
+  within [1×, 100×] of the error of a real float32 kernel (problems whose
+  expert is bit-exact, `tol_ratio == 0`, are exempt).
 - **Non-trivial references:** a test asserts no reference output is
   near-constant (std / (|mean| + 1e-12) > 1e-3) on eval shapes, so all-zero or
   constant-output kernels cannot pass.
+
+## 3b. Case cache
+
+Generating inputs and float64 references at the resized shapes can take
+seconds to minutes (e.g. O(N²) N-body references, per-row CSR generators), and
+grading uses D = 4 data sets per shape. `minidwarf/refcache.py` caches each
+`(inputs, expected)` case as `.npz` under `$MINIDWARF_CACHE` (default
+`~/.cache/minidwarf`), keyed by the SHA-256 of `inputs.py`, `reference.py`,
+the shape and the seed, so editing a problem invalidates its cache. Writes are
+atomic (temp file + rename); an unreadable cache file is recomputed.
+References that do not fit in 8 GB of host RAM at the new shapes are rewritten
+in chunks (same float64 math).
 
 ## 4. Result schema and versioning
 
@@ -118,6 +133,9 @@ and string literals; it is a tripwire, not a sandbox, and the paper says so.
 - `scores.json` gains `harness_version: 3` and the environment record. The
   leaderboard ignores runs whose `harness_version` differs from the current
   one and prints how many it skipped.
+- New CLI subcommand `minidwarf score --run-dir runs/<id>` re-scores an
+  existing run's kernels with the current harness (needed to re-grade
+  generations made under v2); `eval` and `score` take `--allow-busy-gpu`.
 - README: v2 marked deprecated; a v3 section documents the threat model,
   timing protocol, and noise floor. CLAUDE.md updated accordingly.
 
@@ -130,7 +148,7 @@ existing problem, with the expected status:
 |---|---|
 | `memo_static.cu` — computes once, returns early afterwards | `wrong_output` |
 | `memo_copy.cu` — caches result in its own buffer, copies it back | `wrong_output` |
-| `side_stream_nosync.cu` — same kernel as an honest twin, launched on a non-blocking stream without sync | `ok`, with median time ≥ 0.9 × the honest twin's (the side-stream work is inside the timer) |
+| `side_stream_nosync.cu` — same kernel as an honest twin, launched on a non-blocking stream without sync | `ok`, with median time ≥ 0.7 × the honest twin's (the side-stream work is inside the timer; the smoke problem runs in tens of µs, so 0.7 leaves room for noise while the v2 hack measured ≈ 0.2×) |
 | `calls_cublas.cu` | `forbidden_api` |
 | `fopen_grader.cu` | `forbidden_api` |
 | `noop.cu` | `wrong_output` |
