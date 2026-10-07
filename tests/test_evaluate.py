@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
+import shutil, pytest
+from pathlib import Path
 from minidwarf.grade import ProblemResult
-from minidwarf.evaluate import best_result
+from minidwarf.evaluate import best_result, score_run
 
 def mk(status, correct, sp): return ProblemResult("n", "d", status, correct, sp)
 
@@ -13,12 +15,24 @@ def test_best_falls_back_to_least_bad_status():
     assert r.status == "wrong_output"
 
 
-import shutil, pytest
-from pathlib import Path
+def test_forbidden_api_ranks_below_wrong_output():
+    r = best_result([mk("forbidden_api", False, None), mk("wrong_output", False, None)])
+    assert r.status == "wrong_output"
+
+def test_score_run_refuses_busy_gpu(tmp_path, monkeypatch):
+    import json as _json
+    import minidwarf.preflight as pf
+    from minidwarf.preflight import GpuBusyError
+    monkeypatch.setattr(pf, "_smi", lambda args: "42, python\n")
+    run = tmp_path / "r"; run.mkdir()
+    (run / "results.jsonl").write_text(_json.dumps(
+        {"problem": "vector_add", "dwarf": "smoke", "model": "m", "kernel_path": "kernels/x.cu"}) + "\n")
+    with pytest.raises(GpuBusyError):
+        score_run(run, problems_root=Path(__file__).parent / "fixtures")
+
 from minidwarf.evalconfig import EvalConfig
 from minidwarf.models.dummy import DummyModel
 from minidwarf.generate import run_generation
-from minidwarf.evaluate import score_run
 
 @pytest.mark.skipif(shutil.which("nvcc") is None, reason="needs CUDA toolchain")
 def test_score_run_e2e_smoke(tmp_path):
@@ -29,7 +43,9 @@ def test_score_run_e2e_smoke(tmp_path):
     kernel = (SMOKE / "solutions/expert_v1.cu").read_text()
     run_dir = run_generation(cfg, [SMOKE], tmp_path, "r1",
                              model=DummyModel(f"```cuda\n{kernel}\n```"))
-    scores = score_run(run_dir, problems_root=SMOKE.parent.parent)  # tests/fixtures/smoke
+    scores = score_run(run_dir, problems_root=SMOKE.parent.parent, allow_busy_gpu=True)  # tests/fixtures/smoke
     import json
     data = json.loads(scores.read_text())
     assert data["per_problem"][0]["correct"] is True
+    assert data["harness_version"] == 3 and "env" in data
+    assert data["per_problem"][0]["checks"] and data["per_problem"][0]["timings"]

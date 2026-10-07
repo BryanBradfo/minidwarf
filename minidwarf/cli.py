@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-import argparse, json, tempfile
+import argparse, json, sys, tempfile
 from dataclasses import asdict
 from pathlib import Path
 from .grade import grade_problem, ProblemResult
@@ -14,6 +14,10 @@ def main(argv=None):
     ev.add_argument("--config", required=True); ev.add_argument("--split", required=True)
     ev.add_argument("--runs-dir", default="runs"); ev.add_argument("--run-id", default=None)
     ev.add_argument("--only", default=None); ev.add_argument("--canned-file", default=None)
+    ev.add_argument("--allow-busy-gpu", action="store_true")
+    sc = sub.add_parser("score")
+    sc.add_argument("--run-dir", required=True); sc.add_argument("--problems-root", default="problems")
+    sc.add_argument("--allow-busy-gpu", action="store_true")
     lb = sub.add_parser("leaderboard")
     lb.add_argument("--runs-dir", default="runs"); lb.add_argument("--out", default="LEADERBOARD.md")
     a = ap.parse_args(argv)
@@ -47,8 +51,21 @@ def main(argv=None):
         model = create_model(cfg, canned_text=canned) if cfg.provider == "dummy" else None
         run_id = a.run_id or f"{cfg.model_name}-{a.split}"
         run_dir = run_generation(cfg, dirs, Path(a.runs_dir), run_id, model=model)
-        scores = score_run(run_dir)
+        from .preflight import GpuBusyError
+        try:
+            scores = score_run(run_dir, allow_busy_gpu=a.allow_busy_gpu)
+        except GpuBusyError as e:
+            print(f"error: {e}", file=sys.stderr); return 3
         print(json.dumps({"run_dir": str(run_dir), "scores": str(scores)})); return 0
+
+    if a.cmd == "score":
+        from .evaluate import score_run
+        from .preflight import GpuBusyError
+        try:
+            out = score_run(Path(a.run_dir), Path(a.problems_root), allow_busy_gpu=a.allow_busy_gpu)
+        except GpuBusyError as e:
+            print(f"error: {e}", file=sys.stderr); return 3
+        print(str(out)); return 0
 
     if a.cmd == "leaderboard":
         from .leaderboard import write_leaderboard

@@ -7,7 +7,8 @@ _GPU_FIELDS = ["name", "driver_version", "clocks.sm", "clocks.mem", "temperature
 
 def _smi(args):
     if not shutil.which("nvidia-smi"): return None
-    r = subprocess.run(["nvidia-smi", *args], capture_output=True, text=True, timeout=30)
+    try: r = subprocess.run(["nvidia-smi", *args], capture_output=True, text=True, timeout=30)
+    except (subprocess.TimeoutExpired, OSError): return None
     return r.stdout if r.returncode == 0 else None
 
 def parse_compute_apps(text: str) -> list[str]:
@@ -21,13 +22,18 @@ def parse_gpu_query(text: str) -> dict:
     if len(vals) != len(_GPU_FIELDS): return {}
     return {k: (None if v in ("[N/A]", "N/A", "") else v) for k, v in zip(_GPU_FIELDS, vals)}
 
-def busy_processes() -> list[str]:
+def busy_processes() -> list[str] | None:
+    """Compute apps on the GPU; [] if nvidia-smi is not installed; None if installed but the query failed."""
     out = _smi(["--query-compute-apps=pid,process_name", "--format=csv,noheader"])
-    return parse_compute_apps(out) if out else []
+    if out is None: return None if shutil.which("nvidia-smi") else []
+    return parse_compute_apps(out)
 
 def ensure_gpu_idle(allow_busy: bool = False) -> list[str]:
     """Raise GpuBusyError if another process computes on the GPU (unless allow_busy); return those processes."""
     procs = busy_processes()
+    if procs is None:
+        if allow_busy: return []
+        raise GpuBusyError("GPU state unknown: nvidia-smi query failed")
     if procs and not allow_busy:
         raise GpuBusyError("GPU busy, refusing to time kernels: " + "; ".join(procs))
     return procs

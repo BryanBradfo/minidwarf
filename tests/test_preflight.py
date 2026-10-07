@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-import pytest
+import pytest, subprocess
 import minidwarf.preflight as pf
 from minidwarf.preflight import parse_compute_apps, parse_gpu_query, ensure_gpu_idle, GpuBusyError
 
@@ -21,4 +21,20 @@ def test_ensure_gpu_idle_raises_when_busy(monkeypatch):
 
 def test_ensure_gpu_idle_without_nvidia_smi(monkeypatch):
     monkeypatch.setattr(pf, "_smi", lambda args: None)
+    monkeypatch.setattr(pf.shutil, "which", lambda n: None)
     assert ensure_gpu_idle() == [] and pf.env_record() == {}
+
+def test_ensure_gpu_idle_fails_closed_when_smi_query_fails(monkeypatch):
+    monkeypatch.setattr(pf, "_smi", lambda args: None)
+    monkeypatch.setattr(pf.shutil, "which", lambda n: "/usr/bin/nvidia-smi")
+    with pytest.raises(GpuBusyError, match="GPU state unknown"):
+        ensure_gpu_idle()
+    assert ensure_gpu_idle(allow_busy=True) == []
+    assert pf.env_record() == {}
+
+@pytest.mark.parametrize("exc", [subprocess.TimeoutExpired("nvidia-smi", 30), OSError("boom")])
+def test_smi_returns_none_on_timeout_or_oserror(monkeypatch, exc):
+    monkeypatch.setattr(pf.shutil, "which", lambda n: "/usr/bin/nvidia-smi")
+    def boom(*a, **k): raise exc
+    monkeypatch.setattr(pf.subprocess, "run", boom)
+    assert pf._smi(["-L"]) is None
