@@ -12,7 +12,9 @@ _ALWAYS = {
     "environment": r"\bgetenv\s*\(",
 }
 # One pass so a comment marker inside a literal (or a quote inside a char literal) cannot mask code.
-_TOKEN = re.compile(r'"(?:\\.|[^"\\\n])*"|\'(?:\\.|[^\'\\\n])*\'|//[^\n]*|/\*.*?\*/', re.S)
+_TOKEN = re.compile(r'"(?:\\.|[^"\\\n])*"|(?<![\w])(?:u8|u|U|L)?\'(?:\\.|[^\'\\\n])*\'|//[^\n]*|/\*.*?\*/', re.S)
+# Raw strings are not followed by the lexer, so any use fails closed.
+_RAW = re.compile(r'(?<![\w])(?:u8|u|U|L)?R"')
 
 def _strip(src: str) -> str:
     # Blank comments and literal contents, except literals on preprocessor lines (#include "x.h" stays visible).
@@ -31,4 +33,7 @@ def lint_source(src: str, allowed_libs=()) -> list[str]:
     """Return the sorted names of forbidden-API rules matched in `src` (empty when clean)."""
     code = _strip(src)
     rules = {k: v for k, v in _LIBS.items() if k not in set(allowed_libs)} | _ALWAYS
-    return sorted(k for k, pat in rules.items() if re.search(pat, code))
+    hits = [k for k, pat in rules.items() if re.search(pat, code)]
+    if _RAW.search(src):
+        hits.append("raw_string")
+    return sorted(hits)

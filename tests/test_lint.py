@@ -44,3 +44,12 @@ def test_execve_flagged():
 
 def test_quoted_thrust_include_flagged():
     assert lint_source('#include "thrust/sort.h"\n') == ["thrust"]
+
+def test_digit_separator_does_not_hide_call():
+    assert lint_source('int n = 1\'000; fopen("x","r"); int m = 2\'0;') == ["file_io"]
+
+def test_prefixed_char_literal_does_not_hide_call():
+    assert lint_source('char c = u8\'"\'; fopen("x","r"); char d = L\'"\';') == ["file_io"]
+
+def test_raw_string_flagged():
+    assert lint_source('const char* s = R"(x)";') == ["raw_string"]
