@@ -51,6 +51,7 @@ problems or perturbed variants (SP4), model runs (SP5).
 | Same-process escapes the regex can miss (macros, `##`, raw strings, POSIX `open`/`read`/`mmap`, `exit`, host threads, `cudaSetDevice`) | **Symbol check**: the candidate is also compiled alone (`nvcc -c`) and rejected (`forbidden_api`) if `nm -u` lists a banned libc/CUDA/vendor symbol; regex lint also flags `__attribute__((constructor))` | `grade.py`, `lint.py` |
 | Reading files, spawning processes, dynamic loading | Lint bans `fopen`, `fread`, `ifstream`, `system`, `popen`, `exec*`, `dlopen`, `dlsym`, `getenv` → `forbidden_api` | `lint.py` |
 | Hardcoding shapes / test values | Already mitigated by hidden `eval_shapes`; strengthened by `check_shapes` (§3) and D = 4 data sets | spec / driver |
+| In-process memory scanning (reading the driver's expected outputs or state from the candidate's own address space) | **Out of scope, stated in the paper**; same manual audit of every kernel with speedup > 1.5× | protocol |
 | Content-keyed caching (hash inputs, replay) | **Out of scope, stated in the paper.** Mitigation by protocol: every kernel with speedup > 1.5× is manually audited before results are published | protocol |
 
 The lint is a regex scan over the candidate source after stripping comments
