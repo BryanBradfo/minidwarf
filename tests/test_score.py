@@ -16,3 +16,18 @@ def test_rates():
 def test_summarize_shape():
     s = summarize(R)
     assert s["compile_rate"] == 0.75 and s["fast_p"][2] == 0.25
+
+import pytest
+from minidwarf.score import geomean_speedup, HARNESS_VERSION
+
+def test_geomean_speedup():
+    assert geomean_speedup([2.0, 8.0], [1.0, 1.0]) == pytest.approx(4.0)
+    assert geomean_speedup([1.0], [4.0]) == pytest.approx(0.25)
+
+def test_geomean_speedup_invalid_is_none():
+    assert geomean_speedup([], []) is None
+    assert geomean_speedup([1.0], [0.0]) is None
+    assert geomean_speedup([1.0, 2.0], [1.0]) is None
+
+def test_harness_version():
+    assert HARNESS_VERSION == 3
