@@ -48,10 +48,10 @@ def grade_problem(problem_root, candidate_cu, work_dir, seed=12345, reps=30, tim
             ins = gen(shape, seed + i)
             expected = ref(ins, shape)
             output_shapes = [np.asarray(e).shape for e in expected]
-            cr: RunResult = run_binary(cand_exe, ins, shape, output_shapes, reps, timeout_s=timeout_s)
-            if not check_correct(cr.outputs, expected, p.rtol, p.atol):
+            cr: RunResult = run_binary(cand_exe, [ins], shape, output_shapes, reps, warmup=3, timeout_s=timeout_s)
+            if not check_correct(cr.outputs[0], expected, p.rtol, p.atol):
                 correct = False
-            br: RunResult = run_binary(base_exe, ins, shape, output_shapes, reps, timeout_s=timeout_s)
+            br: RunResult = run_binary(base_exe, [ins], shape, output_shapes, reps, warmup=3, timeout_s=timeout_s)
             cand_ms_sum += cr.median_ms
             base_ms_sum += br.median_ms
     except RunError:
