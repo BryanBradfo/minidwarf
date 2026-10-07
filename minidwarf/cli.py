@@ -5,6 +5,15 @@ from pathlib import Path
 from .grade import grade_problem, ProblemResult
 from .score import summarize
 
+def _score(run_dir, root=None, allow_busy=False):
+    """Run score_run; (path, 0) or (None, 3) with `error:` on stderr when the GPU is busy."""
+    from .evaluate import score_run
+    from .preflight import GpuBusyError
+    try:
+        return (score_run(run_dir, Path(root), allow_busy_gpu=allow_busy) if root else score_run(run_dir, allow_busy_gpu=allow_busy)), 0
+    except GpuBusyError as e:
+        print(f"error: {e}", file=sys.stderr); return None, 3
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="minidwarf")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -41,7 +50,6 @@ def main(argv=None):
     if a.cmd == "eval":
         from .evalconfig import load_eval_config
         from .generate import resolve_split, run_generation
-        from .evaluate import score_run
         from .models.registry import create_model
         cfg = load_eval_config(Path(a.config))
         dirs = resolve_split(a.split)
@@ -51,20 +59,13 @@ def main(argv=None):
         model = create_model(cfg, canned_text=canned) if cfg.provider == "dummy" else None
         run_id = a.run_id or f"{cfg.model_name}-{a.split}"
         run_dir = run_generation(cfg, dirs, Path(a.runs_dir), run_id, model=model)
-        from .preflight import GpuBusyError
-        try:
-            scores = score_run(run_dir, allow_busy_gpu=a.allow_busy_gpu)
-        except GpuBusyError as e:
-            print(f"error: {e}", file=sys.stderr); return 3
+        scores, rc = _score(run_dir, allow_busy=a.allow_busy_gpu)
+        if rc: return rc
         print(json.dumps({"run_dir": str(run_dir), "scores": str(scores)})); return 0
 
     if a.cmd == "score":
-        from .evaluate import score_run
-        from .preflight import GpuBusyError
-        try:
-            out = score_run(Path(a.run_dir), Path(a.problems_root), allow_busy_gpu=a.allow_busy_gpu)
-        except GpuBusyError as e:
-            print(f"error: {e}", file=sys.stderr); return 3
+        out, rc = _score(Path(a.run_dir), a.problems_root, a.allow_busy_gpu)
+        if rc: return rc
         print(str(out)); return 0
 
     if a.cmd == "leaderboard":

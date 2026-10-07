@@ -49,3 +49,40 @@ def test_score_run_e2e_smoke(tmp_path):
     assert data["per_problem"][0]["correct"] is True
     assert data["harness_version"] == 3 and "env" in data
     assert data["per_problem"][0]["checks"] and data["per_problem"][0]["timings"]
+
+
+def _run_dir(tmp_path):
+    import json as _json
+    run = tmp_path / "r"; run.mkdir()
+    (run / "results.jsonl").write_text(_json.dumps(
+        {"problem": "vector_add", "dwarf": "smoke", "model": "m", "kernel_path": "kernels/x.cu"}) + "\n")
+    return run
+
+def test_busy_seen_recorded(tmp_path, monkeypatch):
+    import json as _json
+    import minidwarf.preflight as pf, minidwarf.evaluate as ev
+    monkeypatch.setattr(pf, "_smi", lambda args: "42, python\n")
+    monkeypatch.setattr(ev, "grade_problem", lambda *a, **k: ProblemResult("vector_add", "smoke", "ok", True, 1.0))
+    data = _json.loads(score_run(_run_dir(tmp_path), allow_busy_gpu=True).read_text())
+    assert data["busy_seen"] == {"vector_add": ["42, python"]}
+
+def test_stale_scores_removed_on_busy_abort(tmp_path, monkeypatch):
+    import minidwarf.preflight as pf
+    from minidwarf.preflight import GpuBusyError
+    monkeypatch.setattr(pf, "_smi", lambda args: "42, python\n")
+    run = _run_dir(tmp_path); (run / "scores.json").write_text("{}")
+    with pytest.raises(GpuBusyError):
+        score_run(run)
+    assert not (run / "scores.json").exists()
+
+def test_scores_json_is_strict(tmp_path, monkeypatch):
+    import json as _json
+    import minidwarf.preflight as pf, minidwarf.evaluate as ev
+    monkeypatch.setattr(pf, "_smi", lambda args: None)
+    monkeypatch.setattr(pf.shutil, "which", lambda n: None)
+    r = ProblemResult("vector_add", "smoke", "ok", True, 1.0, checks=[{"ratio": float("inf")}])
+    monkeypatch.setattr(ev, "grade_problem", lambda *a, **k: r)
+    text = score_run(_run_dir(tmp_path)).read_text()
+    def bad(c): raise ValueError(c)
+    data = _json.loads(text, parse_constant=bad)
+    assert data["per_problem"][0]["checks"] == [{"ratio": None}]
