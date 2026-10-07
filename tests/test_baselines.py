@@ -10,3 +10,11 @@ def test_known_baselines():
 def test_unknown_baseline_raises():
     with pytest.raises(ValueError):
         link_flags("nope")
+import pytest
+from minidwarf.baselines import lib_flags
+
+def test_lib_flags():
+    assert lib_flags([]) == []
+    assert lib_flags(["curand"]) == ["-lcurand"]
+    with pytest.raises(ValueError):
+        lib_flags(["mkl"])
