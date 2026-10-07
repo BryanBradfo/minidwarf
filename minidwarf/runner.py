@@ -42,10 +42,13 @@ def run_binary(exe, input_sets, dims, output_shapes, reps=20, warmup=3, timeout_
         argv = [str(exe), str(din), str(dout), dexp, str(dt), str(len(in_counts)), str(len(out_counts)),
                 str(n_sets), str(reps), str(warmup), repr(float(rtol)), repr(float(atol)), str(len(dims))]
         argv += [str(int(x)) for x in dims] + [str(c) for c in in_counts] + [str(c) for c in out_counts]
-        r = subprocess.run(argv, capture_output=True, text=True, timeout=timeout_s)
+        r = subprocess.run(argv, capture_output=True, text=True, errors="replace", timeout=timeout_s)
         if r.returncode != 0:
             raise RunError(r.stderr or "non-zero exit")
-        t = json.loads(dt.read_text())
+        try:
+            t = json.loads(dt.read_text()); t["median_ms"], t["p25_ms"], t["p75_ms"], t["times_ms"]
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            raise RunError(f"missing or malformed timing file: {e!r}")
         want = n_sets * sum(out_counts) * 4
         if dout.stat().st_size != want:
             raise RunError(f"output file is {dout.stat().st_size} bytes, expected {want}")

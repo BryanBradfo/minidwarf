@@ -67,3 +67,12 @@ def test_lint_symbols_policy():
     assert got == sorted(["symbol:fopen", "symbol:cublasCreate_v2", "symbol:" + mangled])
     assert lint_symbols(["curand_init"], ["curand"]) == []
     assert lint_symbols(["curand_init"]) == ["symbol:curand_init"]
+
+def test_extra_banned_symbols():
+    assert lint_symbols(["environ", "__open_2", "fdopen", "clone", "cudaMalloc"]) == sorted(
+        ["symbol:environ", "symbol:__open_2", "symbol:fdopen", "symbol:clone"])
+
+def test_lint_defined():
+    from minidwarf.lint import lint_defined
+    got = lint_defined(["minidwarf_solve", "cudaEventElapsedTime", "_Z4vaddPf", "fwrite", "__cudaFoo", "cuInit", "cube"], {"fwrite"})
+    assert got == sorted(["defines:cudaEventElapsedTime", "defines:fwrite", "defines:__cudaFoo", "defines:cuInit"])

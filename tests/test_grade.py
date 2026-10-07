@@ -2,9 +2,8 @@
 from pathlib import Path
 import shutil
 import pytest
-from minidwarf.compile import undefined_symbols
+from minidwarf.compile import compile_object, object_hits
 from minidwarf.grade import grade_problem, N_SETS
-from minidwarf.lint import lint_symbols
 
 pytestmark = pytest.mark.skipif(shutil.which("nvcc") is None, reason="needs nvcc")
 FIX = Path(__file__).parent / "fixtures/smoke/vector_add"
@@ -52,4 +51,30 @@ def test_call_counting_kernel_is_caught(tmp_path):
 
 @pytest.mark.parametrize("cu", EXPERTS, ids=lambda p: p.parents[1].name)
 def test_expert_passes_symbol_check(cu, tmp_path):
-    assert lint_symbols(undefined_symbols(cu, tmp_path)) == []
+    assert object_hits(compile_object(cu, tmp_path)) == []
+
+def _hits(tmp_path, src, **kw):
+    k = tmp_path / "k.cu"; k.write_bytes(src if isinstance(src, bytes) else src.encode())
+    return grade_problem(FIX, k, tmp_path / "w", **kw)
+
+def test_optimize_guarded_fopen_caught(tmp_path):
+    r = _hits(tmp_path, '#include <cstdio>\n#define CAT(a,b) a##b\n#ifdef __OPTIMIZE__\n'
+              'static int s = []{ FILE* f = CAT(fo,pen)("/etc/hostname","rb"); if(f) fclose(f); return 1; }();\n#endif\n' + _entry(""))
+    assert r.status == "forbidden_api" and "symbol:fopen" in r.lint
+
+def test_timer_interposer_caught(tmp_path):
+    r = _hits(tmp_path, '#include <cuda_runtime.h>\nextern "C" cudaError_t cudaEventElapsedTime(float* ms, cudaEvent_t a, cudaEvent_t b)'
+              '{*ms=0.001f; return cudaSuccess;}\n' + _entry(""))
+    assert r.status == "forbidden_api" and "defines:cudaEventElapsedTime" in r.lint
+
+def test_inline_syscall_caught(tmp_path):
+    r = _hits(tmp_path, _entry('__asm__ volatile("syscall");\n'))
+    assert r.status == "forbidden_api" and "asm:syscall" in r.lint
+
+def test_non_utf8_syntax_error_is_compile_error(tmp_path):
+    r = _hits(tmp_path, b'// \xff\xfe\nthis is not c++ \xff\n')
+    assert r.status == "compile_error"
+
+def test_non_utf8_stderr_does_not_raise(tmp_path):
+    r = _hits(tmp_path, '#include <cstdio>\nstatic int s = (fprintf(stderr, "\\xff\\xfe"), 1);\n' + _entry(""))
+    assert r.status == "ok"

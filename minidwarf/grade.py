@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import numpy as np
 from .spec import load_problem
-from .compile import compile_binary, undefined_symbols, CompileError
+from .compile import compile_binary, compile_object, link_binary, object_hits, CompileError
 from .baselines import link_flags, lib_flags
-from .lint import lint_source, lint_symbols
+from .lint import lint_source
 from .refcache import cached_case
 from .runner import run_binary, RunError
 from .correctness import compare
@@ -52,15 +52,15 @@ def grade_problem(problem_root, candidate_cu, work_dir, seed=12345, reps=20, war
     if not trusted:
         hits = lint_source(Path(candidate_cu).read_bytes().decode(errors="replace"), p.allowed_libs)
         if hits: return fail("forbidden_api", lint=hits)
-        try:  # symbol-level check closes macro/##/raw-string bypasses of the regex lint (fail-closed)
-            hits = lint_symbols(undefined_symbols(Path(candidate_cu), work_dir / "symcheck"), p.allowed_libs)
-        except (CompileError, subprocess.TimeoutExpired):
-            return fail("compile_error")
-        if hits: return fail("forbidden_api", lint=hits)
     try:
         base_flags = link_flags(p.baseline)
-        cand_exe = compile_binary(Path(candidate_cu), work_dir / "cand",
-                                  extra_flags=base_flags if trusted else lib_flags(p.allowed_libs))
+        if trusted:
+            cand_exe = compile_binary(Path(candidate_cu), work_dir / "cand", extra_flags=base_flags)
+        else:  # compile once with the real flags, check that exact object, then link it
+            obj = compile_object(Path(candidate_cu), work_dir / "cand")
+            hits = object_hits(obj, p.allowed_libs)
+            if hits: return fail("forbidden_api", lint=hits)
+            cand_exe = link_binary(obj, work_dir / "cand", extra_flags=lib_flags(p.allowed_libs))
         base_exe = compile_binary(p.root / "baseline.cu", work_dir / "base", extra_flags=base_flags)
     except (CompileError, subprocess.TimeoutExpired):
         return fail("compile_error")
