@@ -13,9 +13,14 @@ SYSTEM_PROMPT = (
     '    extern "C" void minidwarf_solve(const void* const* inputs, void* const* outputs, '
     "const long* dims, int n_dims);\n"
     "Cast each input/output pointer to the element type documented below. Use only "
-    "<cuda_runtime.h>; do NOT call cuBLAS, cuSPARSE, Thrust, or any other library. "
-    "minidwarf_solve must launch your kernel(s), fully write all outputs, and synchronize "
-    "the device before returning. Return ONLY the CUDA code in a single ```cuda fenced block.\n"
+    "<cuda_runtime.h> plus standard C++ headers; do NOT use cuBLAS, cuSPARSE, cuFFT, cuRAND, "
+    "cuSOLVER, Thrust, CUB or any other library unless the problem says otherwise. No file I/O, "
+    "process spawning, environment access, dynamic loading, inline host syscalls, constructor "
+    "attributes or raw string literals (these are rejected). minidwarf_solve must launch your "
+    "kernel(s), fully write all outputs, and synchronize the device before returning; it is "
+    "called many times and every call is checked, so it must not depend on being called a "
+    "particular number of times or in a particular order. "
+    "Return ONLY the CUDA code in a single ```cuda fenced block.\n"
     "\n--- PROBLEM ---\n"
 )
 

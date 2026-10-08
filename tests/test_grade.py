@@ -102,3 +102,10 @@ def test_baseline_bad_calls_make_runtime_error(tmp_path):
         'vadd<<<(int)((n+255)/256),256>>>((const float*)in[0],(const float*)in[1],(float*)out[0],n); }\n'))
     r = grade_problem(prob, prob / "solutions/expert_v1.cu", tmp_path / "w", reps=4, warmup=0)
     assert r.status == "runtime_error" and not r.correct and r.baseline_bad_calls > 0 and r.bad_calls == 0
+
+def test_cuda_check_exit_macro_passes_object_hits(tmp_path):
+    k = tmp_path / "k.cu"
+    k.write_text('#include <cstdio>\n#include <cstdlib>\n#define CUDA_CHECK(x) do { cudaError_t e = (x); if (e != cudaSuccess) '
+                 '{ fprintf(stderr, "%s\\n", cudaGetErrorString(e)); exit(1); } } while (0)\n'
+                 + _entry("", 'CUDA_CHECK(cudaGetLastError()); CUDA_CHECK(cudaDeviceSynchronize());'))
+    assert object_hits(compile_object(k, tmp_path / "o")) == []

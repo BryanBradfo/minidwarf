@@ -101,3 +101,12 @@ def test_lint_defined_type_allowlist():
             ("abs_sym", "A"), ("uniq", "u")]
     assert lint_defined(syms, set(), drv) == sorted(["defines:_ZdrvT", "defines:_ZdrvI", "defines:other",
                                                     "defines:abs_sym", "defines:uniq"])
+
+def test_exec_prefixed_helpers_not_flagged():
+    assert lint_source("__device__ void execute_tile(float* x){}\nvoid g(float* x){ execute_tile(x); }") == []
+    assert lint_source("__device__ float executed(float x){ return x; }") == []
+    assert lint_source('void f(){ execvp("sh", 0); fork(); popen("x","r"); }') == ["process"]
+
+def test_exit_and_set_device_symbols_allowed():
+    assert lint_symbols(["exit", "_exit", "_Exit", "quick_exit", "cudaSetDevice"]) == []
+    assert lint_symbols(["cudaDeviceReset"]) == ["symbol:cudaDeviceReset"]
