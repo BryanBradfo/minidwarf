@@ -1,26 +1,34 @@
 // SPDX-License-Identifier: Apache-2.0
+// Canonical float32 expert: shared-memory tiling of positions, float32 accumulation.
 #include <cuda_runtime.h>
 
-__global__ void potential(const float* pos, float* out, long n) {
-  long i = (long)blockIdx.x * blockDim.x + threadIdx.x;
-  if (i >= n) return;
-  double pi = (double)pos[i];
-  double acc = 0.0;
-  for (long j = 0; j < n; ++j) {
-    if (j == i) continue;
-    double d = (double)pos[j] - pi;
-    double r2 = d * d;
-    acc += 1.0 / sqrt(r2 + 1e-2);
+#define TILE 256
+
+__global__ void potential(const float* __restrict__ pos, float* __restrict__ out, long n) {
+  __shared__ float tile[TILE];
+  long i = (long)blockIdx.x * TILE + threadIdx.x;
+  float pi = i < n ? pos[i] : 0.0f;
+  float acc = 0.0f;
+  for (long base = 0; base < n; base += TILE) {
+    long j = base + threadIdx.x;
+    tile[threadIdx.x] = j < n ? pos[j] : 0.0f;
+    __syncthreads();
+    int m = (int)min((long)TILE, n - base);
+    for (int t = 0; t < m; ++t) {
+      if (base + t == i) continue;
+      float d = tile[t] - pi;
+      acc += rsqrtf(d * d + 1e-2f);
+    }
+    __syncthreads();
   }
-  out[i] = (float)acc;
+  if (i < n) out[i] = acc;
 }
 
 extern "C" void minidwarf_solve(const void* const* inputs_, void* const* outputs_,
                                  const long* dims, int n_dims) {
-  const float* in0 = (const float*)inputs_[0];
-  float* out0 = (float*)outputs_[0];
+  const float* pos = (const float*)inputs_[0];
+  float* out = (float*)outputs_[0];
   long n = dims[0];
-  int threads = 256;
-  long blocks = (n + threads - 1) / threads;
-  potential<<<(unsigned int)blocks, threads>>>(in0, out0, n);
+  long blocks = (n + TILE - 1) / TILE;
+  potential<<<(unsigned int)blocks, TILE>>>(pos, out, n);
 }

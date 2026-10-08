@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
+// Naive float32 baseline: one thread per body, plain loop over all others from global memory.
 #include <cuda_runtime.h>
 
 __global__ void knn_distance(const float* pos, float* out, long n) {
   long i = (long)blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= n) return;
-  double pi = (double)pos[i];
-  double best = 1.0 / 0.0; // +inf
+  float pi = pos[i];
+  float best = INFINITY;
   for (long j = 0; j < n; ++j) {
     if (j == i) continue;
-    double d = fabs((double)pos[j] - pi);
+    float d = fabsf(pos[j] - pi);
     if (d < best) best = d;
   }
-  out[i] = (float)best;
+  out[i] = best;
 }
 
 extern "C" void minidwarf_solve(const void* const* inputs_, void* const* outputs_,

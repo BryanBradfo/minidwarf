@@ -31,7 +31,7 @@ where the "obvious" parallel decomposition is not the fast one. A model
 that has memorized flash-attention-shaped kernels gets no special help
 here.
 
-## v2: 4 dwarfs, 24 problems
+## Problem set: 4 dwarfs, 24 problems
 
 | Dwarf             | # problems | valid | test |
 |--------------------|-----------:|------:|-----:|
@@ -46,7 +46,7 @@ MiniF2F, `valid` is meant for iterating on a method (prompting strategy,
 agent scaffold, fine-tuning, ...) and `test` is meant for reporting a
 final, held-out number. Do not tune against `test`.
 
-Problems currently in v2:
+Problems currently in the set (eval shapes resized for v3):
 
 - **structured_grids**: `jacobi_3d_7pt`, `laplacian_2d_5pt`, `gauss_blur_2d`,
   `sobel_2d`, `heat_2d_step`, `wave_2d_step`
@@ -63,18 +63,18 @@ version:
 
 - **v1** (frozen): 2 dwarfs (Structured Grids, N-Body), 12 problems, 6/6
   valid/test.
-- **v2** (frozen, current): 4 dwarfs (adds Dense Linear Algebra and Sparse
-  Linear Algebra), 24 problems, 12/12 valid/test.
+- **v2** (deprecated): harness admits output caching, linked vendor
+  libraries and launch-overhead-dominated timings; do not cite v2 numbers.
+  4 dwarfs, 24 problems, 12/12 valid/test.
+- **v3** (in progress): hardened harness (this release, `harness_version` 3)
+  + new dwarfs (upcoming); report as `MiniDwarf v3`.
 
-**MiniDwarf v2 is frozen at this 24-problem set.** Report results as
-"MiniDwarf v2" (or `MiniDwarf-v2-valid` / `MiniDwarf-v2-test` if you need
-to distinguish the split) so numbers stay comparable across papers and
-runs. v1 numbers remain valid as "MiniDwarf v1" and are not superseded by
-v2 -- they cover a different (smaller) problem set and are not directly
-comparable to a v2 score. If problems are added or changed later, that
-will ship as a new named version (v2.1, v3, ...) rather than silently
-mutating v2 -- a score against "MiniDwarf" without a version is not
-reproducible.
+Report results as "MiniDwarf v3" (or `MiniDwarf-v3-valid` /
+`MiniDwarf-v3-test`) so numbers stay comparable across papers and runs.
+Problems are never silently mutated within a named version -- a score against
+"MiniDwarf" without a version is not reproducible. The leaderboard skips runs
+scored by a different harness version; re-score old generations with
+`minidwarf score` (below).
 
 ## Reference hardware
 
@@ -89,6 +89,9 @@ hardware for MiniDwarf is:
   `baseline.cu` and `solutions/` binaries for every `dense`/`sparse`
   problem whose `spec.yaml` declares `baseline: cublas` or
   `baseline: cusparse` (see "Kernel ABI contract" below).
+
+The reference laptop GPU switches memory clocks (12001 <-> 9001 MHz) under its
+power cap, and clocks cannot be locked without root; see the noise floor below.
 
 Run `python scripts/check_env.py` to verify your toolchain can compile and
 run a trivial `sm_120` kernel before grading anything.
@@ -153,44 +156,110 @@ minidwarf eval --config configs/eval/qwen-coder-ollama.yaml --split valid
 minidwarf leaderboard --runs-dir runs --out LEADERBOARD.md
 ```
 
+```bash
+# re-score an existing run's kernels with the current harness (no model calls)
+minidwarf score --run-dir runs/<id>
+```
+
+`eval` and `score` take `--allow-busy-gpu` (development only; see the GPU
+preflight below). Reference inputs/outputs are cached as `.npz` under
+`$MINIDWARF_CACHE` (default `~/.cache/minidwarf`); the cache can reach ~70 GB,
+accumulates stale entries when problems change, and is safe to delete (it is
+rebuilt on demand).
+
+Maintainer scripts: `scripts/size_shapes.py <problem> <shape>...` times a
+baseline with the v3 driver and prints median ms and device bytes (used to
+size eval shapes); `scripts/calibrate_tol.py` grades the expert kernels and
+records normalized errors to `harness/tolerance_report.json`;
+`scripts/noise_floor.py` runs the A/A noise-floor measurement
+(`harness/noise_floor.json`). `harness/shape_report.json` records the shape
+sizing.
+
 `eval` splits into generation (prompt the model, extract its ``` ```cuda ``` block,
 save the kernel + raw response under `runs/<run_id>/`) and scoring (grade each
 kernel with the same pipeline as `minidwarf run`), so re-scoring never re-runs
 the model. Set `n_samples` in the config for pass@k (the leaderboard reports
 best-of-n). `runs/` is gitignored; commit only the generated `LEADERBOARD.md`.
 
-## Grading pipeline
+## Harness v3: threat model and timing protocol
 
-Each submitted kernel goes through the same four stages:
+Full design: [`docs/superpowers/specs/2026-10-07-hardened-harness-design.md`](docs/superpowers/specs/2026-10-07-hardened-harness-design.md).
+Each submitted kernel goes through compile (with static checks), correctness,
+and timing, with no human or LLM judge.
 
-1. **Compile.** The candidate `.cu` file and the problem's `baseline.cu`
-   are both compiled with `nvcc`. A compile failure on the candidate is
-   scored `compile_error` immediately.
-2. **Correctness.** The candidate is run on the problem's `eval_shapes`
-   (input shapes not disclosed in `prompt.md`) with seeded random inputs,
-   and its outputs are compared against a NumPy reference (`reference.py`)
-   with the problem's `rtol`/`atol`.
-3. **Anti-gaming.** Because `eval_shapes` are not fixed at prompt time
-   (and are shape-varied, not just re-seeded), a kernel that special-cases
-   a hardcoded shape or memorizes an expected output will fail correctness
-   on at least one shape.
-4. **Timing.** Both the candidate and the baseline are run for multiple
-   reps; each rep's device-side GPU time is measured with `cudaEvent`
-   (not host wall-clock time). For each `eval_shapes` entry the median of
-   its reps is taken, and the reported speedup is
-   `sum(baseline medians) / sum(candidate medians)` across all shapes (see
-   `grade.py`) -- not a single wall-clock median.
+**Threat model.** Known reward hacks and their defenses:
+
+| Hack | Defense |
+|---|---|
+| Output caching / call counting / skipping timed reps | 4 data sets rotated through the same buffers in a random (seeded from `std::random_device`) order; outputs NaN-poisoned before every call; **every** call (untimed, warm-up, timed; candidate and baseline) verified in the driver against expected outputs |
+| Rewriting the pointer/dims arrays | Driver re-copies them from master copies before each call |
+| Side-stream work escaping the timer | `cudaDeviceSynchronize()` before the end event |
+| Vendor libraries (cuBLAS, cuSPARSE, Thrust, CUB, ...) | Candidate compiled without vendor link flags; regex lint (also flags raw strings and constructor attributes); optional per-problem `allowed_libs`; status `forbidden_api` |
+| Escapes the regex can miss (file/process/dlopen/syscalls, interposing driver symbols) | Candidate compiled once to an `-O3` object and statically checked with `nm`/`objdump`: banned undefined symbols (`symbol:`), interposing definitions (`defines:`, with a W/V allowlist for driver template names), inline syscalls (`asm:syscall`); then linked with the driver first |
+| Hardcoded or edge-case-blind kernels | Hidden `eval_shapes`; plus `check_shapes` (small/odd sizes, correctness only) and all 4 data sets |
+
+**Stated residual risks.** Content-keyed caching (hash the inputs, replay),
+in-process memory scanning, and obfuscated syscalls are not detected: the
+static checks are a tripwire, not a sandbox. Every kernel with speedup > 1.5x
+is audited manually before results are published. A process sandbox
+(bubblewrap/nsjail) is future work.
+
+**Timing protocol.** Eval shapes are sized so the baseline >= 1 ms and <= 2000 MB device memory (measured on the reference GPU: >= 1.4 ms, <= 1.1 GB). Per binary, the driver does an untimed first call,
+3 warm-up reps, then 20 timed reps over the 4 rotating data sets. Before each
+call (untimed): upload the data set, NaN-poison outputs, flush L2, run a ~10 ms
+device spin to stabilize clocks. The timed region is
+`eventRecord` -> `minidwarf_solve` -> `cudaDeviceSynchronize` -> `eventRecord`.
+For each shape the grader runs baseline, candidate, candidate, baseline
+(BAAB) and pools the two runs of each binary. The reported speedup is the
+geometric mean over shapes of `baseline_median / candidate_median`. A
+candidate run times out after max(60 s, 50x the baseline run's wall time), so
+a correct but slow kernel on a heavy problem is not miscounted as incorrect.
+Set `MINIDWARF_TMP=/dev/shm` to keep the driver's input/output files in RAM
+(much faster at the largest shapes; needs several GB of free memory).
+
+**GPU preflight.** Before timing, the grader refuses to run if another compute
+process is on the GPU: the run aborts with GpuBusyError (exit code 3 from the CLI); it is never scored as a candidate failure.
+`--allow-busy-gpu` overrides for development; the run
+metadata records it (`allow_busy_gpu`, `busy_seen`). `scores.json` also holds
+`harness_version: 3` and the environment (SM/memory clocks, temperature,
+driver) at start and end (the end record is a post-run idle snapshot), plus
+provenance: `git_commit`, `problems_digest` (sha256 over every problem's
+`spec.yaml`, `inputs.py`, `reference.py`, `baseline.cu`) and `numpy_version`.
+
+**Noise floor.** `scripts/noise_floor.py` runs A/A tests (baseline vs itself)
+per problem: 5 repeats, floored at `eps_global` (0.006, pooled over the
+stable problems); problems whose A/A max/min exceeds 1.05 are flagged
+unstable and re-measured with 20 repeats. Currently unstable: `sddmm`
+(eps 0.21) and five compute-bound N-body problems (eps 0.09–0.25), whose
+float32 baselines push the laptop GPU into its power cap. Each problem's
+epsilon `eps_p` is in `harness/noise_floor.json`; the leaderboard lists
+unstable problems as low-confidence.
+
+**Result detail.** `ProblemResult` carries `checks` (per shape/data set error
+stats), `timings` (per-shape medians and IQRs), `lint`, `bad_calls` and
+`baseline_bad_calls`; statuses are `ok`, `compile_error`, `forbidden_api`,
+`runtime_error`, `timeout`, `wrong_output`. JSON reports are strict (non-finite
+values become `null`). `tests/test_redteam.py` runs adversarial kernels
+(memoization, no-ops, cuBLAS calls, file access, shape assumptions, side
+streams) to prove the defenses; calibrated tolerances are checked against the
+expert kernels (`harness/tolerance_report.json`).
 
 ## The `fast_p` metric
 
-`fast_p` is the fraction of problems a submission gets both **correct**
-*and* **at least `p`x faster than the honest baseline** kernel shipped
-with the problem (the baseline is a straightforward, unoptimized
-implementation -- not a strawman, but not tuned either). `fast_p(0)` is
+`fast_p@p` is a **speedup threshold**, not pass@k: it is the fraction of
+problems a submission gets both **correct** *and* **at least `p`x faster
+than the honest baseline** kernel shipped with the problem (the baseline is
+a straightforward, unoptimized implementation -- not a strawman, but not
+tuned either). A problem counts toward `fast_p@p` only if
+`speedup >= p * (1 + eps_p)`, where `eps_p` is that problem's noise floor
+(`eps_global` for unmeasured problems); the leaderboard and `minidwarf suite`
+apply the same rule. `fast_p@0` is
 just the correctness rate (any non-negative speedup counts), and
-`fast_p(1)`, `fast_p(2)`, `fast_p(5)`, ... report the fraction that clears
+`fast_p@1`, `fast_p@2`, `fast_p@5`, ... report the fraction that clears
 increasingly demanding speed bars. `minidwarf suite` reports the full
-curve alongside the raw `compile_rate` and `correctness_rate`, since a low
+noise-floor-adjusted curve (and the `eps_global` it used) alongside the raw
+`compile_rate` (`forbidden_api` counts as not compiled) and
+`correctness_rate`, since a low
 `fast_p` can come from either failing to compile/pass correctness or
 simply being too slow -- those are different failure modes and should be
 reported separately, not collapsed into one number.
@@ -254,9 +323,9 @@ work-buffer allocation) out of the timed path via function-local
 apples-to-apples against a candidate kernel that has no such per-call
 setup cost.
 
-Unlike v1 (where every shipped `solutions/expert_v1.cu` is
-byte-identical to its `baseline.cu`, see "Known limitations" below),
-**the Dense and Sparse dwarfs ship real, distinct hand-written expert
+Unlike the Structured Grids dwarf (whose shipped `solutions/expert_v1.cu`
+files are byte-identical to `baseline.cu`, see "Known limitations" below),
+**the N-Body, Dense and Sparse dwarfs ship real, distinct hand-written expert
 kernels**: e.g. `dense/sgemm`'s `expert_v1.cu` is a shared-memory tiled
 SGEMM kernel, and `sparse/spmv_csr`'s `expert_v1.cu` is a one-thread-
 per-row CSR kernel -- both are different code from their cuBLAS/cuSPARSE
@@ -270,32 +339,30 @@ hand-written baseline) instead, same as v1.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full per-problem file
 layout and how to add new problems.
 
-## Known limitations (v2)
+## Known limitations
 
-- **Shipped experts equal the baselines -- but only for the 12 v1
-  problems.** The `solutions/expert_v1.cu` file for every problem under
-  `structured_grids/` and `nbody/` (the original v1 set) is byte-identical
-  to that problem's `baseline.cu`. They exist to prove the problem is
-  solvable within its `rtol`/`atol` with a real kernel, not as optimized
-  reference implementations -- expect `speedup ~= 1.0` when grading them,
-  not a demonstration of achievable speedup. This caveat does **not**
-  apply to the 12 `dense/` and `sparse/` problems added in v2: their
-  shipped experts are real, distinct hand-written kernels that differ
-  from the (often vendor-library) `baseline.cu` -- see "Vendor baselines"
-  above. Optimized expert solutions (`expert_v2.cu`, etc.) for the v1
-  problems are welcome contributions; see [CONTRIBUTING.md](CONTRIBUTING.md).
-- **Timing trust model assumes a non-adversarial candidate.** The driver
-  (`harness/driver.cu`) reuses the same input/output device buffers across
-  the warmup call and all timed reps, and correctness is checked once from
-  the final buffer contents after timing completes. This means the timing
-  path trusts that the candidate actually does the same work on every
-  rep -- a deliberately adversarial kernel could, in principle, do its real
-  work during the untimed warmup call and no-op (or memoize) during the
-  timed reps to inflate its reported speedup. v2 does not defend against
-  this; the intended mitigation for a future version is to re-randomize
-  inputs before each timed rep (a naive per-rep memset was deliberately
-  not added in this pass, since it would distort the speedup ratio for
-  honest kernels without a properly designed fix).
+- **Shipped experts equal the baselines -- but only for the 6
+  `structured_grids/` problems.** Their `solutions/expert_v1.cu` is
+  byte-identical to `baseline.cu`: it proves the problem is solvable within
+  its `rtol`/`atol`, not achievable speedup (expect `speedup ~= 1.0`). The
+  `nbody/` experts are shared-memory tiled float32 kernels measured against
+  naive float32 baselines (both sides float32, so speedups reflect kernel
+  design, not an FP64-to-FP32 switch), and the `dense/`/`sparse/` experts
+  are distinct hand-written kernels against (often vendor-library)
+  baselines -- see "Vendor baselines" above. Optimized stencil experts
+  (`expert_v2.cu`, etc.) are welcome contributions; see
+  [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Best-of-n selection bias.** `scores.json` keeps the fastest correct of
+  n samples, timed once; with n > 1 this max is biased upward by timing
+  noise, so a best-of-n speedup should be re-timed in a fresh grade (or
+  eps scaled with n) before it is reported (planned for SP5).
+- **Static checks are not a sandbox.** v3 defends against output caching,
+  call counting and vendor-library use (see the threat model), but
+  content-keyed caching, in-process memory scanning and obfuscated syscalls
+  are not detected; kernels with speedup > 1.5x are audited manually.
+- **Laptop-GPU timing noise.** Clock switching under the power cap cannot be
+  locked without root; per-problem noise floors and the unstable-problem list
+  quantify it.
 - **The anti-gaming property is against the prompt, not against repo
   access.** `eval_shapes` (in each problem's `spec.yaml`) and the grading
   `seed` (in `grade.py`) are committed in this repository. The guarantee

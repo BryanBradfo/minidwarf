@@ -3,7 +3,7 @@ import numpy as np
 
 def run(inputs, shape):
     ny, nx = shape
-    u = inputs[0].reshape(ny, nx)
+    u = inputs[0].reshape(ny, nx).astype(np.float64)  # float64 ground truth
     out = np.zeros_like(u)
     gx = (
         -u[:-2, :-2] + u[:-2, 2:] +

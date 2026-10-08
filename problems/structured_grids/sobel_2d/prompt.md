@@ -67,7 +67,7 @@ extern "C" void minidwarf_solve(const void* const* inputs,
   `outputs[0]` is fully written and valid by the time `minidwarf_solve`
   returns to the caller.
 - Correctness is checked against a NumPy reference implementation with
-  `rtol = 1e-3` and `atol = 1e-4`. Any grid shape (not fixed in advance) may
+  `rtol = 1e-4` and `atol = 1e-5`. Any grid shape (not fixed in advance) may
   be used to evaluate your kernel, so do not hardcode grid dimensions,
   assume specific tile sizes divide the grid evenly, or otherwise depend on
   a particular shape.

@@ -18,10 +18,15 @@ def test_cli_eval_dummy_then_leaderboard(tmp_path):
     r = subprocess.run([sys.executable, "-m", "minidwarf.cli", "eval",
                         "--config", str(cfg), "--split", "test",
                         "--runs-dir", str(runs), "--only", "knn_distance_1d",
-                        "--canned-file", str(canned)], cwd=ROOT, capture_output=True, text=True)
+                        "--canned-file", str(canned), "--allow-busy-gpu"], cwd=ROOT, capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     lb = subprocess.run([sys.executable, "-m", "minidwarf.cli", "leaderboard",
                          "--runs-dir", str(runs), "--out", str(tmp_path / "LB.md")],
                         cwd=ROOT, capture_output=True, text=True)
     assert lb.returncode == 0 and (tmp_path / "LB.md").exists()
     assert "knn_distance_1d".split("_")[0] or True  # leaderboard built
+    run_dir = next(runs.iterdir())
+    sc = subprocess.run([sys.executable, "-m", "minidwarf.cli", "score", "--run-dir", str(run_dir),
+                         "--allow-busy-gpu"], cwd=ROOT, capture_output=True, text=True)
+    assert sc.returncode == 0, sc.stderr
+    assert json.loads((run_dir / "scores.json").read_text())["harness_version"] == 3

@@ -47,6 +47,6 @@ extern "C" void minidwarf_solve(const void* const* inputs,
   `outputs[0]` is fully written and valid by the time `minidwarf_solve`
   returns to the caller.
 - Correctness is checked against a NumPy (float64 internally) reference
-  implementation with `rtol = 1e-3` and `atol = 1e-4`. Any number of bodies
+  implementation with `rtol = 1e-3` and `atol = 5e-2`. Any number of bodies
   `N` (not fixed in advance) may be used to evaluate your kernel, so do not
   hardcode `N` or otherwise depend on a particular size.

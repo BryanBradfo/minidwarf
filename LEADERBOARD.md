@@ -2,13 +2,12 @@
 
 | Model | compile% | correct% | fast_p@1 | fast_p@2 | fast_p@5 |
 |---|---|---|---|---|---|
-| qwen2.5-coder-1.5b | 16.7% | 0.0% | 0.0% | 0.0% | 0.0% |
 
 ## Per-dwarf breakdown
 
 | Model | Dwarf | correct% | fast_p@1 |
 |---|---|---|---|
-| qwen2.5-coder-1.5b | dense | 0.0% | 0.0% |
-| qwen2.5-coder-1.5b | nbody | 0.0% | 0.0% |
-| qwen2.5-coder-1.5b | sparse | 0.0% | 0.0% |
-| qwen2.5-coder-1.5b | structured_grids | 0.0% | 0.0% |
+
+`fast_p@p`: share of problems solved correctly with speedup >= p * (1 + eps), where eps is that problem's own timing noise floor (eps_global = 0.022 for unmeasured problems, eps_max = 0.222; harness v3).
+Unstable timing: sddmm (eps 0.22), spmm_csr (eps 0.04) — fast_p for these is reported but low-confidence.
+_Skipped 2 run(s) scored with another harness version._

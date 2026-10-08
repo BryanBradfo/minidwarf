@@ -22,3 +22,8 @@ def test_run_generation_writes_artifacts(tmp_path):
 
 def test_system_prompt_mentions_abi():
     assert "minidwarf_solve" in SYSTEM_PROMPT
+
+def test_system_prompt_states_v3_rules():
+    for s in ("<cuda_runtime.h>", "cuBLAS", "cuSPARSE", "cuFFT", "cuRAND", "cuSOLVER", "Thrust", "CUB", "file I/O",
+              "process", "environment", "dynamic loading", "syscall", "constructor", "raw string", "number of times"):
+        assert s in SYSTEM_PROMPT, s

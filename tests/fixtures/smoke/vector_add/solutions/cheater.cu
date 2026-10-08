@@ -6,9 +6,9 @@
 // if those shapes change, this fixture must be updated to match.
 //
 // The purpose is to prove that grade_problem truly requires the candidate
-// to pass ALL eval shapes, not just the first one. A grader bug that only
-// checked eval_shapes[0] would incorrectly mark this cheater as correct;
-// the real grader must catch it via eval_shapes[1].
+// to pass ALL shapes. It is now caught first by check_shapes (it writes zeros
+// for any n != 1048576) and still by eval_shapes[1], so a grader that only
+// checked eval_shapes[0] would wrongly mark it correct.
 #include <cuda_runtime.h>
 __global__ void add(const float* a, const float* b, float* c, long n){
   long i=blockIdx.x*(long)blockDim.x+threadIdx.x; if(i<n) c[i]=a[i]+b[i];

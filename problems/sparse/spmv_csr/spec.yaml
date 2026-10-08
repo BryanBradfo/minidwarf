@@ -6,5 +6,6 @@ rtol: 1.0e-3
 atol: 1.0e-4
 n_inputs: 4
 n_outputs: 1
-eval_shapes: [[2048, 2048, 20480], [3000, 2000, 24000]]
+eval_shapes: [[2097152, 2097152, 67108864], [1800000, 2500000, 50000000]]
+check_shapes: [[1, 1, 1], [37, 29, 20], [129, 67, 1000]]
 baseline: cusparse

@@ -26,3 +26,31 @@ def test_load_problem_non_dict_raises(tmp_path):
     (tmp_path / "spec.yaml").write_text("- a\n- b\n")
     with pytest.raises(ValueError):
         load_problem(tmp_path)
+
+BASE = ("name: x\ndwarf: d\ndifficulty: easy\nrtol: 1.0e-5\natol: 1.0e-6\n"
+        "n_inputs: 1\nn_outputs: 1\neval_shapes: [[4]]\nbaseline: author_kernel\n")
+
+def test_optional_fields_default_empty(tmp_path):
+    (tmp_path / "spec.yaml").write_text(BASE)
+    p = load_problem(tmp_path)
+    assert p.check_shapes == [] and p.allowed_libs == []
+
+def test_optional_fields_parsed(tmp_path):
+    (tmp_path / "spec.yaml").write_text(BASE + "check_shapes: [[1], [33]]\nallowed_libs: [curand]\n")
+    p = load_problem(tmp_path)
+    assert p.check_shapes == [[1], [33]] and p.allowed_libs == ["curand"]
+
+def test_unknown_allowed_lib_raises(tmp_path):
+    (tmp_path / "spec.yaml").write_text(BASE + "allowed_libs: [mkl]\n")
+    with pytest.raises(ValueError):
+        load_problem(tmp_path)
+
+def test_scalar_allowed_libs_rejected_clearly(tmp_path):
+    (tmp_path / "spec.yaml").write_text(BASE + "allowed_libs: curand\n")
+    with pytest.raises(ValueError, match="list"):
+        load_problem(tmp_path)
+
+def test_malformed_check_shapes_rejected(tmp_path):
+    (tmp_path / "spec.yaml").write_text(BASE + "check_shapes: 5\n")
+    with pytest.raises(ValueError, match="check_shapes"):
+        load_problem(tmp_path)

@@ -39,6 +39,27 @@ Required fields (see `minidwarf/spec.py` for the loader): `name`, `dwarf`,
 kernels against -- **these are not disclosed in `prompt.md`** (see the
 anti-contamination rule below).
 
+Harness v3 rules for every problem (enforced by the tests named):
+
+- **`check_shapes`** (correctness only, never timed): at least 3 small/odd
+  shapes with the same rank as `eval_shapes`, at least one with a leading
+  dimension that is **not a multiple of 32** (`tests/test_check_shapes.py`).
+- **`allowed_libs`** (optional, default empty): vendor libraries a
+  *candidate* may use for this problem (e.g. `[curand]` for Monte Carlo);
+  anything else is `forbidden_api`. Unknown names are rejected by the loader.
+- **Sizing.** Every eval shape must make the baseline take **>= 1 ms**
+  (median, verified as when graded) and use **<= 2000 MB** of device memory;
+  keep the second shape off powers of two. Measure with
+  `python scripts/size_shapes.py problems/<dwarf>/<name> <shape> ...`, then
+  confirm `python scripts/size_shapes.py --check-all` exits 0.
+- **Tolerances** are calibrated against the expert kernel:
+  `python scripts/calibrate_tol.py` reports
+  `tol_ratio = max|a - e| / (atol + rtol*|e|)`, which must be **exact (0) or
+  within 0.01 <= tol_ratio <= 1** (`tests/test_tolerances.py`): the
+  tolerance must pass a real float32 kernel without being 100x looser.
+- **Non-trivial reference.** The reference output on the first eval shape
+  must not be near-constant (`tests/test_problem_invariants.py`).
+
 `baseline` must be one of `author_kernel`, `cublas`, or `cusparse`
 (`minidwarf/baselines.py`'s `link_flags`); it selects both what
 `baseline.cu` is expected to contain and which extra linker flags
@@ -47,6 +68,9 @@ candidate and the baseline for this problem:
 
 - `author_kernel`: `baseline.cu` is a straightforward, hand-written
   `minidwarf_solve` using only `<cuda_runtime.h>` -- no extra link flags.
+  It computes in `float32` like the candidates (no `double`: FP64 runs at
+  ~1/64 of FP32 on consumer GPUs, so a double baseline would score the
+  precision switch rather than the kernel; `tests/test_baselines.py`).
   Use this for `structured_grids`/`nbody` problems, and for any `dense`/
   `sparse` problem that has no clean single vendor-library call for its
   exact operation (e.g. `sparse/csr_row_scale`, `sparse/sddmm`,
@@ -157,8 +181,8 @@ The problem statement given to a model attempting the kernel. It must
 describe the math, the data layout, and the `minidwarf_solve` ABI in
 enough detail to implement the kernel, but:
 
-**NEVER put eval shapes or seeds in `prompt.md`.** The `eval_shapes` in
-`spec.yaml` and the seeds used by the grader are held out specifically so
+**NEVER put eval shapes, check shapes or seeds in `prompt.md`.** The
+`eval_shapes`/`check_shapes` in `spec.yaml` and the seeds used by the grader are held out specifically so
 a submitted kernel can't hardcode a shape, special-case an expected
 output, or otherwise game correctness without actually solving the
 general problem. If you need to illustrate the ABI with an example, use a
@@ -170,10 +194,11 @@ shape that is clearly a toy example, distinct from anything in
 At least one working `minidwarf_solve` implementation (e.g.
 `solutions/expert_v1.cu`) that a maintainer can point to as evidence the
 problem is solvable and the tolerances are achievable by a real kernel.
-For the v1 problems (`structured_grids`/`nbody`), the maintainer's
-`expert_v1.cu` files are byte-identical to `baseline.cu` -- they
-establish solvability, not achievable speedup (see "Known limitations" in
-the [README](README.md)). For the v2 `dense`/`sparse` problems, ship a
+For the `structured_grids` problems, the maintainer's `expert_v1.cu`
+files are byte-identical to `baseline.cu` -- they establish solvability,
+not achievable speedup (see "Known limitations" in the
+[README](README.md)). The `nbody` experts are shared-memory tiled float32
+kernels, distinct from the naive float32 baselines. For the v2 `dense`/`sparse` problems, ship a
 real, distinct hand-written `expert_v1.cu` even when `baseline.cu` calls
 a vendor library (`cublas`/`cusparse`) -- see `problems/dense/sgemm/` and
 `problems/sparse/spmv_csr/` for examples of a hand-written expert kernel

@@ -14,9 +14,9 @@ def write_arrays(path: Path, arrays: list[np.ndarray]) -> None:
     with open(path, "wb") as fh:
         for a in arrays:
             if a.dtype == np.float32:
-                fh.write(np.ascontiguousarray(a, dtype=np.float32).tobytes())
+                fh.write(memoryview(np.ascontiguousarray(a, dtype=np.float32)).cast("B"))  # no bytes copy
             elif a.dtype == np.int32:
-                fh.write(np.ascontiguousarray(a, dtype=np.int32).tobytes())
+                fh.write(memoryview(np.ascontiguousarray(a, dtype=np.int32)).cast("B"))
             else:
                 raise ValueError(f"unsupported dtype {a.dtype}; only float32 and int32 are supported")
 

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
+// Naive float32 baseline: one thread per body, plain loop over all others from global memory.
 #include <cuda_runtime.h>
 
 __global__ void count_within_radius(const float* pos, float* out, long n) {
   long i = (long)blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= n) return;
-  double pi = (double)pos[i];
-  long count = 0;
+  float pi = pos[i];
+  int count = 0;
   for (long j = 0; j < n; ++j) {
     if (j == i) continue;
-    double d = fabs((double)pos[j] - pi);
-    if (d < 3.0) count++;
+    if (fabsf(pos[j] - pi) < 3.0f) count++;
   }
   out[i] = (float)count;
 }
