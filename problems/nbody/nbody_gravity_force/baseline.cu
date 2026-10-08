@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
+// Naive float32 baseline: one thread per body, plain loop over all others from global memory.
 #include <cuda_runtime.h>
 
 __global__ void gravity_force(const float* pos, float* out, long n) {
   long i = (long)blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= n) return;
-  double pi = (double)pos[i];
-  double acc = 0.0;
+  float pi = pos[i];
+  float acc = 0.0f;
   for (long j = 0; j < n; ++j) {
     if (j == i) continue;
-    double d = (double)pos[j] - pi;
-    double r2 = d * d;
-    double denom = pow(r2 + 1e-2, 1.5);
-    acc += d / denom;
+    float d = pos[j] - pi;
+    float r2 = d * d + 1e-2f;
+    acc += d / (r2 * sqrtf(r2));
   }
-  out[i] = (float)acc;
+  out[i] = acc;
 }
 
 extern "C" void minidwarf_solve(const void* const* inputs_, void* const* outputs_,
