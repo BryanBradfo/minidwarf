@@ -92,11 +92,25 @@ def test_noise_floor_pools_repeats(tmp_path, monkeypatch):
     monkeypatch.setattr(m, "grade_problem", lambda *a, **k: SimpleNamespace(status="ok", speedup=next(seq)))
     monkeypatch.setattr(m, "ensure_gpu_idle", _noop); monkeypatch.setattr(m, "env_record", lambda: {"t": 1})
     out = tmp_path / "nf.json"
-    assert m.main(["--problems-root", str(root), "--out", str(out), "--repeats", "3"]) == 0
+    assert m.main(["--problems-root", str(root), "--out", str(out), "--repeats", "3", "--unstable-repeats", "3"]) == 0
     rep = json.loads(out.read_text())
     p0 = rep["per_problem"]["p0"]
     assert p0["speedups"] == pytest.approx([1.0, 1.1, 1 / 1.1]) and p0["max"] == pytest.approx(1.1)
     assert rep["eps"] == pytest.approx(m.eps_from_speedups([1.0, 1.1, 1 / 1.1, 1.0, 1.0, 1.0]))
     assert rep["repeats"] == 3 and rep["env_end"] == {"t": 1}
-    assert p0["eps"] == pytest.approx(0.1) and rep["per_problem"]["p1"]["eps"] == pytest.approx(0.0)
-    assert rep["eps_global"] == rep["eps"] and rep["eps_max"] == pytest.approx(0.1)
+    g = rep["eps_global"]
+    assert g == rep["eps"] and p0["eps"] == pytest.approx(max(0.1, g)) and rep["eps_max"] == pytest.approx(0.1)
+    assert rep["per_problem"]["p1"]["eps"] == pytest.approx(g)  # floored at eps_global
+    assert p0["unstable"] and p0["n_repeats"] == 3 and not rep["per_problem"]["p1"]["unstable"]
+
+def test_noise_floor_extends_unstable_problems(tmp_path, monkeypatch):
+    m = _load("noise_floor")
+    root = _fake_problems(tmp_path / "probs", 2)
+    seq = iter([1.0, 1.2, 1.0, 1.0, 1.0, 0.8] + [1.0] * 20)  # p0 bimodal after 2, extended to 6; p1 stable
+    monkeypatch.setattr(m, "grade_problem", lambda *a, **k: SimpleNamespace(status="ok", speedup=next(seq)))
+    monkeypatch.setattr(m, "ensure_gpu_idle", _noop); monkeypatch.setattr(m, "env_record", lambda: {})
+    out = tmp_path / "nf.json"
+    assert m.main(["--problems-root", str(root), "--out", str(out), "--repeats", "2", "--unstable-repeats", "6"]) == 0
+    rep = json.loads(out.read_text()); p0, p1 = rep["per_problem"]["p0"], rep["per_problem"]["p1"]
+    assert p0["unstable"] and p0["n_repeats"] == 6 and p0["eps"] == pytest.approx(0.25)  # 1/0.8 over all samples
+    assert not p1["unstable"] and p1["n_repeats"] == 2
