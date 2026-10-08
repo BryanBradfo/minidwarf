@@ -91,11 +91,11 @@
   },
   {
     "problem": "nbody_potential",
-    "rtol": 0.001,
+    "rtol": 0.0002,
     "atol": 0.0001,
     "status": "ok",
     "bad_calls": 0,
-    "tol_ratio": 0.013581613847190713,
+    "tol_ratio": 0.06790691750377816,
     "verdict": "ok"
   },
   {
@@ -118,11 +118,11 @@
   },
   {
     "problem": "jacobi_sparse",
-    "rtol": 0.0005,
-    "atol": 1e-09,
+    "rtol": 1e-05,
+    "atol": 1e-06,
     "status": "ok",
     "bad_calls": 0,
-    "tol_ratio": 0.13839383665198585,
+    "tol_ratio": 0.13545309761285693,
     "verdict": "ok"
   },
   {
