@@ -7,8 +7,9 @@
 // baseline is a hand-written kernel (baseline: author_kernel), not a
 // vendor library call. One thread per row: each thread linearly scans its
 // row to find the diagonal entry (by matching col_idx[k] == i) while
-// accumulating the full row dot product, then subtracts the diagonal
-// contribution and divides.
+// accumulating the off-diagonal products, then divides. (Summing the full row
+// and subtracting diag * x[i] afterwards cancels catastrophically when the
+// diagonal dominates, so the diagonal term is skipped instead.)
 __global__ void jacobi_sparse_kernel(const float* __restrict__ values, const int* __restrict__ row_ptr,
                                       const int* __restrict__ col_idx, const float* __restrict__ b,
                                       const float* __restrict__ x, float* __restrict__ x_new, int R) {
@@ -18,19 +19,18 @@ __global__ void jacobi_sparse_kernel(const float* __restrict__ values, const int
   int start = row_ptr[i];
   int end = row_ptr[i + 1];
 
-  float full_sum = 0.0f;
+  float off_sum = 0.0f;
   float diag = 0.0f;
   for (int k = start; k < end; ++k) {
     int j = col_idx[k];
     float v = values[k];
-    float contrib = v * x[j];
-    full_sum += contrib;
     if (j == i) {
       diag = v;
+    } else {
+      off_sum += v * x[j];
     }
   }
 
-  float off_sum = full_sum - diag * x[i];
   x_new[i] = (b[i] - off_sum) / diag;
 }
 
