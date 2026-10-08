@@ -2,13 +2,15 @@
 import numpy as np
 
 EPS = 1e-2
+CHUNK = 1024  # rows per block: bounds the pairwise temporaries to CHUNK x N float64
 
 def run(inputs, shape):
-    pos = inputs[0].astype(np.float64)
-    d = pos[:, None] - pos[None, :]  # d[i, j] = pos[i] - pos[j]
-    r2 = d * d
-    denom = np.power(r2 + EPS, 1.5)
-    contrib = d / denom
-    np.fill_diagonal(contrib, 0.0)
-    out = contrib.sum(axis=1)
+    pos = inputs[0].astype(np.float64); n = pos.size
+    out = np.empty(n)
+    for s in range(0, n, CHUNK):
+        e = min(s + CHUNK, n)
+        d = pos[s:e, None] - pos[None, :]  # d[i, j] = pos[i] - pos[j]
+        contrib = d / np.power(d * d + EPS, 1.5)
+        contrib[np.arange(e - s), np.arange(s, e)] = 0.0
+        out[s:e] = contrib.sum(axis=1)
     return [out.astype(np.float32)]
