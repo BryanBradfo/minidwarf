@@ -5,6 +5,6 @@ rtol: 1.0e-3
 atol: 1.0e-4
 n_inputs: 1
 n_outputs: 1
-eval_shapes: [[4096], [5000]]
+eval_shapes: [[16384], [15000]]
 check_shapes: [[3], [33], [1031]]
 baseline: author_kernel
