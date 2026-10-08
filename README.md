@@ -204,8 +204,7 @@ static checks are a tripwire, not a sandbox. Every kernel with speedup > 1.5x
 is audited manually before results are published. A process sandbox
 (bubblewrap/nsjail) is future work.
 
-**Timing protocol.** Eval shapes are sized so the baseline runs >= 1.4 ms
-(<= 1.1 GB device memory). Per binary, the driver does an untimed first call,
+**Timing protocol.** Eval shapes are sized so the baseline >= 1 ms and <= 2000 MB device memory (measured on the reference GPU: >= 1.4 ms, <= 1.1 GB). Per binary, the driver does an untimed first call,
 3 warm-up reps, then 20 timed reps over the 4 rotating data sets. Before each
 call (untimed): upload the data set, NaN-poison outputs, flush L2, run a ~10 ms
 device spin to stabilize clocks. The timed region is
@@ -214,9 +213,9 @@ For each shape the grader runs candidate, baseline, baseline, candidate
 (ABBA) and pools the two runs of each binary. The reported speedup is the
 geometric mean over shapes of `baseline_median / candidate_median`.
 
-**GPU preflight.** Before timing, the grader refuses to run (status `gpu_busy`,
-an error for the whole run, not a candidate failure) if another compute
-process is on the GPU. `--allow-busy-gpu` overrides for development; the run
+**GPU preflight.** Before timing, the grader refuses to run if another compute
+process is on the GPU: the run aborts with GpuBusyError (exit code 3 from the CLI); it is never scored as a candidate failure.
+`--allow-busy-gpu` overrides for development; the run
 metadata records it (`allow_busy_gpu`, `busy_seen`). `scores.json` also holds
 `harness_version: 3` and the environment (SM/memory clocks, temperature,
 driver) at start and end; the end record is a post-run idle snapshot.
@@ -241,9 +240,9 @@ expert kernels (`harness/tolerance_report.json`).
 
 `fast_p@p` is a **speedup threshold**, not pass@k: it is the fraction of
 problems a submission gets both **correct** *and* **at least `p`x faster
-than the honest baseline** kernel shipped
-with the problem (the baseline is a straightforward, unoptimized
-implementation -- not a strawman, but not tuned either). On the leaderboard a problem counts toward `fast_p@p` only if
+than the honest baseline** kernel shipped with the problem (the baseline is
+a straightforward, unoptimized implementation -- not a strawman, but not
+tuned either). On the leaderboard a problem counts toward `fast_p@p` only if
 `speedup >= p * (1 + eps_p)`, where `eps_p` is that problem's noise floor.
 `fast_p@0` is
 just the correctness rate (any non-negative speedup counts), and
