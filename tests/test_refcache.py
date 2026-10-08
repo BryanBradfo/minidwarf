@@ -28,3 +28,13 @@ def test_corrupt_cache_file_is_recomputed(tmp_path, monkeypatch):
     path.parent.mkdir(parents=True); path.write_bytes(b"truncated")
     ins, outs = cached_case(FIX, [50], 3)
     np.testing.assert_array_equal(outs[0], ins[0] + ins[1])
+
+def test_failed_save_leaves_no_temp_file(tmp_path, monkeypatch):
+    import pytest
+    import minidwarf.refcache as rc
+    monkeypatch.setenv("MINIDWARF_CACHE", str(tmp_path))
+    def boom(*a, **k): raise OSError("disk full")
+    monkeypatch.setattr(rc.np, "savez", boom)
+    with pytest.raises(OSError):
+        cached_case(FIX, [10], 1)
+    assert list(tmp_path.rglob("*.tmp.npz")) == []

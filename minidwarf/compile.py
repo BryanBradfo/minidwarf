@@ -47,11 +47,6 @@ def link_binary(obj: Path, out_dir: Path, arch: str = "sm_120", extra_flags=None
         raise CompileError(r.stderr)
     return exe
 
-def _nm(args, obj) -> list[str]:
-    r = _run(["nm", *args, str(obj)], 60)
-    if r.returncode != 0:
-        raise CompileError(r.stderr)
-    return [ln.split()[-1] for ln in r.stdout.splitlines() if ln.split()]
 
 def undefined_symbols(obj: Path) -> list[str]:
     """Undefined symbols of a compiled object (`nm -u`)."""
@@ -63,15 +58,18 @@ def _nm_typed(args, obj) -> list[tuple[str, str]]:
         raise CompileError(r.stderr)
     return [(f[-1], f[-2]) for f in (ln.split() for ln in r.stdout.splitlines()) if len(f) >= 2]
 
+def _nm(args, obj) -> list[str]:
+    return [n for n, _ in _nm_typed(args, obj)]
+
 def defined_symbols(obj: Path) -> list[tuple[str, str]]:
     """(name, nm type) of an object's defined globals."""
     return _nm_typed(["-g", "--defined-only"], obj)
 
 @functools.lru_cache(maxsize=None)
-def _forbidden_defined() -> tuple[frozenset, frozenset]:
+def _forbidden_defined(arch: str = "sm_120") -> tuple[frozenset, frozenset]:
     """(names forbidden at any strength, driver-defined names forbidden only as strong definitions)."""
     with tempfile.TemporaryDirectory() as d:
-        r = _run(["nvcc", "-arch=sm_120", *NVCC_FLAGS, "-c", str(DRIVER), "-o", str(Path(d) / "driver.o")])
+        r = _run(["nvcc", f"-arch={arch}", *NVCC_FLAGS, "-c", str(DRIVER), "-o", str(Path(d) / "driver.o")])
         if r.returncode != 0:
             raise CompileError(r.stderr)
         drv = Path(d) / "driver.o"
@@ -97,7 +95,7 @@ def asm_hits(obj: Path) -> list[str]:
         raise CompileError(r.stderr)
     return ["asm:syscall"] if _ASM.search(r.stdout) else []
 
-def object_hits(obj: Path, allowed_libs=()) -> list[str]:
+def object_hits(obj: Path, allowed_libs=(), arch: str = "sm_120") -> list[str]:
     """All object-level policy hits (undefined symbols, interposing definitions, inline syscalls), sorted."""
     return sorted(set(lint_symbols(undefined_symbols(obj), allowed_libs)
-                      + lint_defined(defined_symbols(obj), *_forbidden_defined()) + asm_hits(obj)))
+                      + lint_defined(defined_symbols(obj), *_forbidden_defined(arch)) + asm_hits(obj)))

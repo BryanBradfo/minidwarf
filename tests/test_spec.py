@@ -44,3 +44,13 @@ def test_unknown_allowed_lib_raises(tmp_path):
     (tmp_path / "spec.yaml").write_text(BASE + "allowed_libs: [mkl]\n")
     with pytest.raises(ValueError):
         load_problem(tmp_path)
+
+def test_scalar_allowed_libs_rejected_clearly(tmp_path):
+    (tmp_path / "spec.yaml").write_text(BASE + "allowed_libs: curand\n")
+    with pytest.raises(ValueError, match="list"):
+        load_problem(tmp_path)
+
+def test_malformed_check_shapes_rejected(tmp_path):
+    (tmp_path / "spec.yaml").write_text(BASE + "check_shapes: 5\n")
+    with pytest.raises(ValueError, match="check_shapes"):
+        load_problem(tmp_path)

@@ -30,6 +30,9 @@ def cached_case(problem_root, shape, seed):
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp.npz"); os.close(fd)
     arrays = {f"in_{i}": a for i, a in enumerate(ins)} | {f"out_{i}": a for i, a in enumerate(outs)}
-    np.savez(tmp, n_in=len(ins), n_out=len(outs), **arrays)
+    try:
+        np.savez(tmp, n_in=len(ins), n_out=len(outs), **arrays)
+    except BaseException:
+        os.unlink(tmp); raise  # never leave multi-GB orphans behind (e.g. disk full)
     os.replace(tmp, path)  # atomic: concurrent readers never see a half-written file
     return ins, outs
