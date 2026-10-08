@@ -317,9 +317,9 @@ work-buffer allocation) out of the timed path via function-local
 apples-to-apples against a candidate kernel that has no such per-call
 setup cost.
 
-Unlike v1 (where every shipped `solutions/expert_v1.cu` is
-byte-identical to its `baseline.cu`, see "Known limitations" below),
-**the Dense and Sparse dwarfs ship real, distinct hand-written expert
+Unlike the Structured Grids dwarf (whose shipped `solutions/expert_v1.cu`
+files are byte-identical to `baseline.cu`, see "Known limitations" below),
+**the N-Body, Dense and Sparse dwarfs ship real, distinct hand-written expert
 kernels**: e.g. `dense/sgemm`'s `expert_v1.cu` is a shared-memory tiled
 SGEMM kernel, and `sparse/spmv_csr`'s `expert_v1.cu` is a one-thread-
 per-row CSR kernel -- both are different code from their cuBLAS/cuSPARSE
@@ -335,18 +335,21 @@ layout and how to add new problems.
 
 ## Known limitations
 
-- **Shipped experts equal the baselines -- but only for the 12 v1
-  problems.** The `solutions/expert_v1.cu` file for every problem under
-  `structured_grids/` and `nbody/` (the original v1 set) is byte-identical
-  to that problem's `baseline.cu`. They exist to prove the problem is
-  solvable within its `rtol`/`atol` with a real kernel, not as optimized
-  reference implementations -- expect `speedup ~= 1.0` when grading them,
-  not a demonstration of achievable speedup. This caveat does **not**
-  apply to the 12 `dense/` and `sparse/` problems added in v2: their
-  shipped experts are real, distinct hand-written kernels that differ
-  from the (often vendor-library) `baseline.cu` -- see "Vendor baselines"
-  above. Optimized expert solutions (`expert_v2.cu`, etc.) for the v1
-  problems are welcome contributions; see [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Shipped experts equal the baselines -- but only for the 6
+  `structured_grids/` problems.** Their `solutions/expert_v1.cu` is
+  byte-identical to `baseline.cu`: it proves the problem is solvable within
+  its `rtol`/`atol`, not achievable speedup (expect `speedup ~= 1.0`). The
+  `nbody/` experts are shared-memory tiled float32 kernels measured against
+  naive float32 baselines (both sides float32, so speedups reflect kernel
+  design, not an FP64-to-FP32 switch), and the `dense/`/`sparse/` experts
+  are distinct hand-written kernels against (often vendor-library)
+  baselines -- see "Vendor baselines" above. Optimized stencil experts
+  (`expert_v2.cu`, etc.) are welcome contributions; see
+  [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Best-of-n selection bias.** `scores.json` keeps the fastest correct of
+  n samples, timed once; with n > 1 this max is biased upward by timing
+  noise, so a best-of-n speedup should be re-timed in a fresh grade (or
+  eps scaled with n) before it is reported (planned for SP5).
 - **Static checks are not a sandbox.** v3 defends against output caching,
   call counting and vendor-library use (see the threat model), but
   content-keyed caching, in-process memory scanning and obfuscated syscalls
