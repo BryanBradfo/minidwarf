@@ -98,7 +98,7 @@ def test_noise_floor_pools_repeats(tmp_path, monkeypatch):
     rep = json.loads(out.read_text())
     p0 = rep["per_problem"]["p0"]
     assert p0["speedups"] == pytest.approx([1.0, 1.1, 1 / 1.1]) and p0["max"] == pytest.approx(1.1)
-    assert rep["eps"] == pytest.approx(m.eps_from_speedups([1.0, 1.1, 1 / 1.1, 1.0, 1.0, 1.0]))
+    assert rep["eps"] == pytest.approx(m.eps_from_speedups([1.0, 1.0, 1.0]))  # stable problems only (p0 is unstable)
     assert rep["repeats"] == 3 and rep["env_end"] == {"t": 1}
     g = rep["eps_global"]
     assert g == rep["eps"] and p0["eps"] == pytest.approx(max(0.1, g)) and rep["eps_max"] == pytest.approx(0.1)
@@ -116,7 +116,7 @@ def test_noise_floor_extends_unstable_problems(tmp_path, monkeypatch):
     rep = json.loads(out.read_text()); p0, p1 = rep["per_problem"]["p0"], rep["per_problem"]["p1"]
     assert p0["unstable"] and p0["n_repeats"] == 6 and p0["eps"] == pytest.approx(0.25)  # 1/0.8 over all samples
     assert not p1["unstable"] and p1["n_repeats"] == 2
-    assert rep["eps_global"] == pytest.approx(m.eps_from_speedups([1.0, 1.2, 1.0, 1.0]))  # first 2 per problem only
+    assert rep["eps_global"] == pytest.approx(m.eps_from_speedups([1.0, 1.0]))  # stable problems only
 
 def test_noise_floor_abort_keeps_committed_file(tmp_path, monkeypatch):
     m = _load("noise_floor")
@@ -142,3 +142,9 @@ def test_noise_floor_complete_run_replaces_out_and_drops_partial(tmp_path, monke
     out = tmp_path / "nf.json"; out.write_text('{"eps": 0.02}')
     assert m.main(["--problems-root", str(root), "--out", str(out), "--repeats", "1"]) == 0
     assert json.loads(out.read_text())["eps_global"] == 0.0 and not (tmp_path / "nf.json.partial").exists()
+
+def test_noise_floor_global_falls_back_when_all_unstable():
+    m = _load("noise_floor")
+    per = {f"p{i}": {"speedups": [1.0, 1.3], "eps_raw": 0.3, "unstable": True} for i in range(2)}
+    rep = m._report(per, {}, 2, 2, {}, {}, "d", 2)
+    assert rep["eps_global"] == pytest.approx(m.eps_from_speedups([1.0, 1.3, 1.0, 1.3]))

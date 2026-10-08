@@ -20,14 +20,16 @@ def problem_eps(speedups):
 def is_unstable(speedups):
     return max(speedups) / min(speedups) > UNSTABLE_RATIO
 
-POOLING_NOTE = "eps_global pools the first `repeats` A/A samples of every problem; extra runs of unstable problems only raise their own eps"
+POOLING_NOTE = ("eps_global pools the first `repeats` A/A samples of every STABLE problem (all problems if none is "
+                "stable); unstable problems only set their own eps")
 
 def _report(per, failed, total, done, env_start, env_end, date, repeats):
     # global eps only once every problem is done and at least half succeeded; pooled over the first `repeats`
-    # samples of every problem (equal weight: the extra runs of unstable problems must not inflate it).
+    # samples of the stable problems (unstable ones would otherwise set a ~15% floor for every problem).
     # Per-problem eps = max(own largest deviation over all its samples, eps_global). "eps" (= eps_global) is kept.
     enough = done == total and len(per) * 2 >= total and per
-    g = eps_from_speedups([x for r in per.values() for x in r["speedups"][:repeats]]) if enough else None
+    pool = [r for r in per.values() if not r["unstable"]] or list(per.values())
+    g = eps_from_speedups([x for r in pool for x in r["speedups"][:repeats]]) if enough else None
     out = {k: {**r, "eps": max(r["eps_raw"], g or 0.0)} for k, r in per.items()}
     m = max(r["eps"] for r in out.values()) if enough else None
     return {"eps": g, "eps_global": g, "eps_max": m, "quantile": 0.95, "repeats": repeats,
