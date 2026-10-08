@@ -1,7 +1,7 @@
 name: nbody_potential
 dwarf: nbody
 difficulty: medium
-rtol: 1.0e-3
+rtol: 2.0e-4
 atol: 1.0e-4
 n_inputs: 1
 n_outputs: 1

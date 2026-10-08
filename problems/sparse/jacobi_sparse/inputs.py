@@ -51,9 +51,10 @@ def generate(shape, seed):
 
         vals = rng.standard_normal(k)
         diag_pos = int(np.searchsorted(cols, r))
-        # Make the diagonal dominant (and safely nonzero) so a single Jacobi
-        # step divides by a well-conditioned value.
-        vals[diag_pos] += R
+        # Strictly diagonally dominant (and safely nonzero) with a diagonal of
+        # O(row length), not O(R), so the outputs' scale (and the tolerance)
+        # does not depend on the matrix size.
+        vals[diag_pos] = np.abs(np.delete(vals, diag_pos)).sum() + 1.0
         values[start:end] = vals.astype(np.float32)
 
     b = rng.standard_normal(R).astype(np.float32)
