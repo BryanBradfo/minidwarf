@@ -1,13 +1,24 @@
 # SPDX-License-Identifier: Apache-2.0
-import importlib.util
+import importlib.util, json
 from pathlib import Path
+from types import SimpleNamespace
 import pytest
+from minidwarf.report import sanitize, write_report
 
-SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS = ROOT / "scripts"
 
 def _load(name):
     spec = importlib.util.spec_from_file_location(name, SCRIPTS / f"{name}.py")
     mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod); return mod
+
+def _noop(*a, **k): return []
+
+def _fake_problems(root, n):
+    for i in range(n):
+        d = root / f"c{i}" / f"p{i}"; d.mkdir(parents=True)
+        (d / "spec.yaml").write_text(""); (d / "baseline.cu").write_text("")
+    return root
 
 def test_row_ok():
     m = _load("size_shapes")
@@ -22,3 +33,54 @@ def test_verdict():
     m = _load("calibrate_tol")
     assert m.verdict(0.0) == "exact" and m.verdict(0.5) == "ok"
     assert m.verdict(2.0) == "fail" and m.verdict(0.001) == "too_loose"
+
+def test_calibrate_fails_on_grade_status(monkeypatch):
+    m = _load("calibrate_tol")
+    pdir = next((ROOT / "problems").glob("*/*"))
+    def fake(status, bad=0):
+        return lambda *a, **k: SimpleNamespace(status=status, checks=[{"tol_ratio": 0.5}], bad_calls=bad)
+    monkeypatch.setattr(m, "grade_problem", fake("ok"))
+    assert m.calibrate(pdir)["verdict"] == "ok"
+    monkeypatch.setattr(m, "grade_problem", fake("runtime_error"))
+    row = m.calibrate(pdir)
+    assert row["verdict"] == "fail" and row["status"] == "runtime_error"
+    monkeypatch.setattr(m, "grade_problem", fake("wrong_output", bad=2))
+    row = m.calibrate(pdir)
+    assert row["verdict"] == "fail" and row["bad_calls"] == 2
+
+def test_sanitize_non_finite_to_none():
+    assert sanitize({"a": float("inf"), "b": [1.0, float("nan")], "c": 2.5}) == {"a": None, "b": [1.0, None], "c": 2.5}
+
+def test_write_report_is_strict_json(tmp_path):
+    out = tmp_path / "r.json"
+    write_report(out, {"x": float("inf"), "y": 1.5})
+    def reject(c): raise ValueError(c)
+    assert json.loads(out.read_text(), parse_constant=reject) == {"x": None, "y": 1.5}
+    assert not (tmp_path / "r.json.tmp").exists()
+
+def test_empty_problems_root_exits_2(tmp_path, monkeypatch):
+    for name in ("size_shapes", "noise_floor", "calibrate_tol"):
+        m = _load(name); monkeypatch.setattr(m, "ensure_gpu_idle", _noop)
+        args = ["--problems-root", str(tmp_path)] + (["--check-all"] if name == "size_shapes" else [])
+        assert m.main(args) == 2, name
+
+def test_noise_floor_none_speedup_is_failure(tmp_path, monkeypatch):
+    m = _load("noise_floor")
+    root = _fake_problems(tmp_path / "probs", 3)
+    seq = iter([1.0, None, 1.1])
+    monkeypatch.setattr(m, "grade_problem", lambda *a, **k: SimpleNamespace(status="ok", speedup=next(seq)))
+    monkeypatch.setattr(m, "ensure_gpu_idle", _noop); monkeypatch.setattr(m, "env_record", lambda: {})
+    out = tmp_path / "nf.json"
+    assert m.main(["--problems-root", str(root), "--out", str(out)]) == 1
+    rep = json.loads(out.read_text())
+    assert "p1" in rep["failed"] and rep["eps"] is not None and "p1" not in rep["per_problem"]
+
+def test_noise_floor_refuses_eps_below_half(tmp_path, monkeypatch):
+    m = _load("noise_floor")
+    root = _fake_problems(tmp_path / "probs", 3)
+    seq = iter([None, None, 1.0])
+    monkeypatch.setattr(m, "grade_problem", lambda *a, **k: SimpleNamespace(status="ok", speedup=next(seq)))
+    monkeypatch.setattr(m, "ensure_gpu_idle", _noop); monkeypatch.setattr(m, "env_record", lambda: {})
+    out = tmp_path / "nf.json"
+    assert m.main(["--problems-root", str(root), "--out", str(out)]) == 1
+    assert json.loads(out.read_text())["eps"] is None
