@@ -71,7 +71,7 @@ def test_noise_floor_none_speedup_is_failure(tmp_path, monkeypatch):
     monkeypatch.setattr(m, "grade_problem", lambda *a, **k: SimpleNamespace(status="ok", speedup=next(seq)))
     monkeypatch.setattr(m, "ensure_gpu_idle", _noop); monkeypatch.setattr(m, "env_record", lambda: {})
     out = tmp_path / "nf.json"
-    assert m.main(["--problems-root", str(root), "--out", str(out)]) == 1
+    assert m.main(["--problems-root", str(root), "--out", str(out), "--repeats", "1"]) == 1
     rep = json.loads(out.read_text())
     assert "p1" in rep["failed"] and rep["eps"] is not None and "p1" not in rep["per_problem"]
 
@@ -82,5 +82,19 @@ def test_noise_floor_refuses_eps_below_half(tmp_path, monkeypatch):
     monkeypatch.setattr(m, "grade_problem", lambda *a, **k: SimpleNamespace(status="ok", speedup=next(seq)))
     monkeypatch.setattr(m, "ensure_gpu_idle", _noop); monkeypatch.setattr(m, "env_record", lambda: {})
     out = tmp_path / "nf.json"
-    assert m.main(["--problems-root", str(root), "--out", str(out)]) == 1
+    assert m.main(["--problems-root", str(root), "--out", str(out), "--repeats", "1"]) == 1
     assert json.loads(out.read_text())["eps"] is None
+
+def test_noise_floor_pools_repeats(tmp_path, monkeypatch):
+    m = _load("noise_floor")
+    root = _fake_problems(tmp_path / "probs", 2)
+    seq = iter([1.0, 1.1, 1 / 1.1, 1.0, 1.0, 1.0])
+    monkeypatch.setattr(m, "grade_problem", lambda *a, **k: SimpleNamespace(status="ok", speedup=next(seq)))
+    monkeypatch.setattr(m, "ensure_gpu_idle", _noop); monkeypatch.setattr(m, "env_record", lambda: {"t": 1})
+    out = tmp_path / "nf.json"
+    assert m.main(["--problems-root", str(root), "--out", str(out), "--repeats", "3"]) == 0
+    rep = json.loads(out.read_text())
+    p0 = rep["per_problem"]["p0"]
+    assert p0["speedups"] == pytest.approx([1.0, 1.1, 1 / 1.1]) and p0["max"] == pytest.approx(1.1)
+    assert rep["eps"] == pytest.approx(m.eps_from_speedups([1.0, 1.1, 1 / 1.1, 1.0, 1.0, 1.0]))
+    assert rep["repeats"] == 3 and rep["env_end"] == {"t": 1}

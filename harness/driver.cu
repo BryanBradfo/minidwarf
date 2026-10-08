@@ -3,6 +3,8 @@
 // D input data sets rotate (random order) through the SAME device buffers; before every call (untimed) the set
 // is re-uploaded, outputs are poisoned with NaN and L2 is flushed; the timed region ends with a device-wide sync.
 // EVERY call (first, warm-up, timed) is verified against the expected outputs outside the timed region.
+// After the L2 flush every call is preceded (untimed) by a ~10 ms spin on all SMs, so the host-side verify gap
+// before it cannot leave the GPU downclocked when the timed call starts (same for candidate and baseline).
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -16,6 +18,13 @@
   fprintf(stderr,"CUDA error at %s:%d: %s\n",__FILE__,__LINE__,cudaGetErrorString(_e)); exit(1);} } while(0)
 
 extern "C" void minidwarf_solve(const void* const*, void* const*, const long*, int);
+
+// streams over the scratch buffer until `cycles` SM cycles have passed: keeps both SM and memory clocks up
+static __global__ void minidwarf_driver_spin(const unsigned* buf, size_t n, long long cycles, unsigned* sink){
+  size_t i=(size_t)blockIdx.x*blockDim.x+threadIdx.x, stride=(size_t)gridDim.x*blockDim.x; unsigned acc=0;
+  long long t0=clock64();
+  while(clock64()-t0 < cycles){ for(int k=0;k<64;k++){ acc+=buf[i]; i+=stride; if(i>=n) i-=n; } }
+  if(acc==0x9e3779b9u) *sink=acc; }
 
 static bool wr(const void* p, size_t n, FILE* f){ return n==0 || fwrite(p,1,n,f)==n; }
 
@@ -56,12 +65,17 @@ int main(int argc, char** argv){
   std::vector<void*> arg_in(n_in), arg_out(n_out); std::vector<long> arg_dims(n_dims>0?n_dims:1);
   int l2=0; CUDA_CHECK(cudaDeviceGetAttribute(&l2, cudaDevAttrL2CacheSize, 0));
   size_t flush_bytes=2*(size_t)(l2>0 ? l2 : (64<<20)); void* scratch; CUDA_CHECK(cudaMalloc(&scratch, flush_bytes));
+  int khz=0, n_sm=1; CUDA_CHECK(cudaDeviceGetAttribute(&khz, cudaDevAttrClockRate, 0));
+  CUDA_CHECK(cudaDeviceGetAttribute(&n_sm, cudaDevAttrMultiProcessorCount, 0));
+  const long long spin_cycles = 10LL * (khz > 0 ? khz : 1000000);  // ~10 ms at the rated SM clock (kHz = cycles/ms)
 
   auto prep=[&](int s, int r){
     CUDA_CHECK(cudaSetDevice(0));
     for(int i=0;i<n_in;i++) CUDA_CHECK(cudaMemcpy(din[i], hin[(size_t)s*n_in+i].data(), in_cnt[i]*4, cudaMemcpyHostToDevice));
     for(int i=0;i<n_out;i++) CUDA_CHECK(cudaMemset(dout[i], 0xFF, out_cnt[i]*4));  // NaN poison
     CUDA_CHECK(cudaMemset(scratch, r & 0xFF, flush_bytes));                          // L2 flush
+    minidwarf_driver_spin<<<4*n_sm, 256>>>((const unsigned*)scratch, flush_bytes/4, spin_cycles, (unsigned*)scratch);
+    CUDA_CHECK(cudaGetLastError());                                                   // clocks back up
     CUDA_CHECK(cudaDeviceSynchronize()); };
   auto call=[&](){
     for(int i=0;i<n_in;i++) arg_in[i]=din[i];
