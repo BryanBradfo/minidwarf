@@ -30,7 +30,8 @@ def measure(pdir, shapes):
             cases = [cached_case(p.root, shape, SEED + 1000 * i + k) for k in range(N_SETS)]
             case_s = time.perf_counter() - t0
             ins, exp = [c[0] for c in cases], [c[1] for c in cases]
-            r = run_binary(exe, ins, shape, [e.shape for e in exp[0]], reps=20, warmup=3)
+            r = run_binary(exe, ins, shape, [e.shape for e in exp[0]], reps=20, warmup=3,  # verified, as when graded
+                           expected_sets=exp, rtol=p.rtol, atol=p.atol)
             dev_mb = (sum(a.nbytes for a in ins[0]) + sum(e.nbytes for e in exp[0])) / 1e6
             rows.append({"problem": p.name, "shape": list(shape), "base_median_ms": r.median_ms,
                          "device_mb": dev_mb, "case_s": case_s,

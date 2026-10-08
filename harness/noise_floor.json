@@ -1,0 +1,39 @@
+{
+  "eps": 0.07107422607220926,
+  "quantile": 0.95,
+  "env": {
+    "name": "NVIDIA GeForce RTX 5070 Laptop GPU",
+    "driver_version": "580.178.04",
+    "clocks.sm": "0",
+    "clocks.mem": "9001",
+    "temperature.gpu": "55"
+  },
+  "date": "2026-10-08",
+  "per_problem": {
+    "gemm_bias": 1.000701491479206,
+    "gemv": 1.0712103643968822,
+    "scaled_gemm": 0.9987780567284832,
+    "sgemm": 0.9956002185933595,
+    "syrk": 0.9933174527294026,
+    "transpose": 0.9994655875459191,
+    "coulomb_1d": 1.0013492736699798,
+    "knn_distance_1d": 1.0023424492887307,
+    "nbody_count_within_radius": 0.9990214637611913,
+    "nbody_gravity_force": 0.9999479389662431,
+    "nbody_potential": 0.9999271097414857,
+    "pairwise_mean_dist": 0.9999801721921369,
+    "csr_row_scale": 0.9988453576129632,
+    "jacobi_sparse": 1.00008341948172,
+    "sddmm": 1.1320708370731911,
+    "spmm_csr": 0.9618928253636659,
+    "spmv_csr": 0.9997328726483915,
+    "spmv_transpose": 0.9993577344512076,
+    "gauss_blur_2d": 0.9997550175794845,
+    "heat_2d_step": 1.0019008968060084,
+    "jacobi_3d_7pt": 0.9431589747959006,
+    "laplacian_2d_5pt": 0.943852792683829,
+    "sobel_2d": 0.9424060840422149,
+    "wave_2d_step": 0.9343147729299369
+  },
+  "failed": {}
+}

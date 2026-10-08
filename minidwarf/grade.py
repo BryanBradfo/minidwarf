@@ -90,7 +90,10 @@ def grade_problem(problem_root, candidate_cu, work_dir, seed=12345, reps=20, war
                     r = cand(ins, exp, shape, shapes, reps, warmup)
                     checks += _checks(r, exp, shape, p, "eval"); ct += r.times_ms
                 else:
-                    r = run_binary(base_exe, ins, shape, shapes, reps, warmup, timeout_s); bt += r.times_ms
+                    # verified like the candidate (result unused) so both binaries see the same per-call
+                    # host work between timed reps; otherwise GPU clock state differs and A/A drifts 10-30%
+                    r = run_binary(base_exe, ins, shape, shapes, reps, warmup, timeout_s,
+                                   expected_sets=exp, rtol=p.rtol, atol=p.atol); bt += r.times_ms
                 del r
             timings.append({"shape": list(shape), "cand_median_ms": float(np.median(ct)), "cand_iqr_ms": _iqr(ct),
                             "base_median_ms": float(np.median(bt)), "base_iqr_ms": _iqr(bt)})
