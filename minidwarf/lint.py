@@ -7,7 +7,7 @@ _ALWAYS = {
     "thrust": r"\bthrust\s*::|[<\"]thrust/",
     "cub": r"\bcub\s*::|[<\"]cub/",
     "file_io": r"\b(fopen|freopen|fread|ifstream|ofstream|fstream)\b|\bopen\s*\(",
-    "process": r"\b(system|popen|fork|execl|execlp|execle|execv|execvp|execvpe|execve|fexecve)\s*\(",
+    "process": r"\b(system|popen|fork|execl|execlp|execle|execv|execvp|execvpe|execve|execveat|fexecve)\s*\(",
     "dynamic_loading": r"\b(dlopen|dlsym)\s*\(",
     "environment": r"\bgetenv\s*\(",
     "constructor": r"__attribute__\s*\(\(\s*constructor|\[\[\s*gnu::constructor",
@@ -40,7 +40,7 @@ def lint_source(src: str, allowed_libs=()) -> list[str]:
     return sorted(hits)
 
 _BAN_EXACT = frozenset("""fopen fopen64 freopen fread open open64 openat openat64 creat read pread pread64 mmap mmap64
-system popen fork vfork execl execlp execle execv execvp execvpe execve fexecve posix_spawn posix_spawnp syscall
+system popen fork vfork execl execlp execle execv execvp execvpe execve execveat fexecve posix_spawn posix_spawnp syscall
 dlopen dlsym dlmopen dlvsym getenv secure_getenv pthread_create mprotect pkey_mprotect cudaDeviceReset
 environ __environ freopen64 fdopen clone __clone posix_spawn_file_actions_addopen __open_2 __open64_2 __openat_2
 __openat64_2 __read_chk __pread_chk __pread64_chk __fread_chk __fread_unlocked_chk fread_unlocked""".split())

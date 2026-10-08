@@ -106,6 +106,8 @@ def test_exec_prefixed_helpers_not_flagged():
     assert lint_source("__device__ void execute_tile(float* x){}\nvoid g(float* x){ execute_tile(x); }") == []
     assert lint_source("__device__ float executed(float x){ return x; }") == []
     assert lint_source('void f(){ execvp("sh", 0); fork(); popen("x","r"); }') == ["process"]
+    assert lint_source('void f(){ execveat(0, "sh", 0, 0, 0); }') == ["process"]
+    assert lint_symbols(["execveat"]) == ["symbol:execveat"]
 
 def test_exit_and_set_device_symbols_allowed():
     assert lint_symbols(["exit", "_exit", "_Exit", "quick_exit", "cudaSetDevice"]) == []
