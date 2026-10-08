@@ -218,7 +218,9 @@ process is on the GPU: the run aborts with GpuBusyError (exit code 3 from the CL
 `--allow-busy-gpu` overrides for development; the run
 metadata records it (`allow_busy_gpu`, `busy_seen`). `scores.json` also holds
 `harness_version: 3` and the environment (SM/memory clocks, temperature,
-driver) at start and end; the end record is a post-run idle snapshot.
+driver) at start and end (the end record is a post-run idle snapshot), plus
+provenance: `git_commit`, `problems_digest` (sha256 over every problem's
+`spec.yaml`, `inputs.py`, `reference.py`, `baseline.cu`) and `numpy_version`.
 
 **Noise floor.** `scripts/noise_floor.py` runs A/A tests (baseline vs itself)
 per problem: 5 repeats, floored at `eps_global` (0.0215); problems whose A/A

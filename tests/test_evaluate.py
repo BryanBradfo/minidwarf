@@ -86,3 +86,34 @@ def test_scores_json_is_strict(tmp_path, monkeypatch):
     def bad(c): raise ValueError(c)
     data = _json.loads(text, parse_constant=bad)
     assert data["per_problem"][0]["checks"] == [{"ratio": None}]
+
+def test_scores_json_records_provenance(tmp_path, monkeypatch):
+    import json as _json, re, numpy
+    import minidwarf.preflight as pf, minidwarf.evaluate as ev
+    monkeypatch.setattr(pf, "_smi", lambda args: "")
+    monkeypatch.setattr(ev, "grade_problem", lambda *a, **k: ProblemResult("vector_add", "smoke", "ok", True, 1.0))
+    root = Path(__file__).parent / "fixtures"
+    data = _json.loads(score_run(_run_dir(tmp_path), problems_root=root).read_text())
+    assert re.fullmatch(r"[0-9a-f]{40}", data["git_commit"])
+    assert data["numpy_version"] == numpy.__version__
+    assert data["problems_digest"] == ev.problems_digest(root) and len(data["problems_digest"]) == 64
+
+def test_problems_digest_tracks_graded_files(tmp_path):
+    from minidwarf.evaluate import problems_digest
+    d = tmp_path / "dw" / "p"; d.mkdir(parents=True)
+    for f in ("spec.yaml", "inputs.py", "reference.py", "baseline.cu", "prompt.md"): (d / f).write_text(f)
+    h = problems_digest(tmp_path)
+    (d / "prompt.md").write_text("changed"); assert problems_digest(tmp_path) == h  # not a graded file
+    (d / "reference.py").write_text("changed"); assert problems_digest(tmp_path) != h
+
+def test_git_commit_none_outside_repo(tmp_path, monkeypatch):
+    import minidwarf.evaluate as ev
+    monkeypatch.setattr(ev, "_REPO", tmp_path)
+    assert ev.git_commit() is None
+
+def test_cli_run_prints_strict_json(monkeypatch, capsys):
+    import json as _json, minidwarf.cli as cli
+    monkeypatch.setattr(cli, "grade_problem", lambda *a, **k: ProblemResult("p", "d", "ok", True, float("nan")))
+    assert cli.main(["run", "--problem", "x", "--kernel", "y"]) == 0
+    out = capsys.readouterr().out
+    assert "NaN" not in out and _json.loads(out)["speedup"] is None

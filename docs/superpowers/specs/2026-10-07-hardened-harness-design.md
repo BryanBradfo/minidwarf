@@ -141,7 +141,8 @@ in chunks (same float64 math).
   - `timings`: list of `{shape, cand_median_ms, cand_iqr_ms, base_median_ms, base_iqr_ms}`;
   - `lint`: list of forbidden matches (empty when clean).
   - New statuses: `forbidden_api`. (`gpu_busy` aborts the run instead.)
-- `scores.json` gains `harness_version: 3` and the environment record. The
+- `scores.json` gains `harness_version: 3`, the environment record and provenance
+  (`git_commit`, `problems_digest`, `numpy_version`). The
   leaderboard ignores runs whose `harness_version` differs from the current
   one and prints how many it skipped.
 - New CLI subcommand `minidwarf score --run-dir runs/<id>` re-scores an

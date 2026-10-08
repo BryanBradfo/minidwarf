@@ -3,6 +3,7 @@ import argparse, json, sys, tempfile
 from dataclasses import asdict
 from pathlib import Path
 from .grade import grade_problem, ProblemResult
+from .report import sanitize
 from .score import summarize
 
 def _score(run_dir, root=None, allow_busy=False):
@@ -34,7 +35,7 @@ def main(argv=None):
     if a.cmd == "run":
         with tempfile.TemporaryDirectory() as d:
             res = grade_problem(Path(a.problem), Path(a.kernel), Path(d))
-        print(json.dumps(asdict(res))); return 0
+        print(json.dumps(sanitize(asdict(res)), allow_nan=False)); return 0
 
     if a.cmd == "suite":
         results = []
