@@ -26,6 +26,7 @@ class ProblemResult:
     timings: list = field(default_factory=list)
     lint: list = field(default_factory=list)
     bad_calls: int = 0
+    baseline_bad_calls: int = 0  # non-zero means the problem/harness is broken, not the candidate
 
 def _cases(root, shape, seed0):
     cases = [cached_case(root, shape, seed0 + d) for d in range(N_SETS)]
@@ -65,7 +66,7 @@ def grade_problem(problem_root, candidate_cu, work_dir, seed=12345, reps=20, war
     except (CompileError, subprocess.TimeoutExpired):
         return fail("compile_error")
 
-    checks, timings, bad = [], [], 0
+    checks, timings, bad, base_bad = [], [], 0, 0
     def cand(ins, exp, shape, shapes, n_reps, n_warm):
         nonlocal bad
         r = run_binary(cand_exe, ins, shape, shapes, n_reps, n_warm, timeout_s,
@@ -94,6 +95,7 @@ def grade_problem(problem_root, candidate_cu, work_dir, seed=12345, reps=20, war
                     # host work between timed reps; otherwise GPU clock state differs and A/A drifts 10-30%
                     r = run_binary(base_exe, ins, shape, shapes, reps, warmup, timeout_s,
                                    expected_sets=exp, rtol=p.rtol, atol=p.atol); bt += r.times_ms
+                    base_bad += r.n_bad_calls or 0
                 del r
             timings.append({"shape": list(shape), "cand_median_ms": float(np.median(ct)), "cand_iqr_ms": _iqr(ct),
                             "base_median_ms": float(np.median(bt)), "base_iqr_ms": _iqr(bt)})
@@ -102,6 +104,8 @@ def grade_problem(problem_root, candidate_cu, work_dir, seed=12345, reps=20, war
     except subprocess.TimeoutExpired:
         return fail("timeout", checks=checks, timings=timings, bad_calls=bad)
 
+    if base_bad:  # the baseline itself disagrees with the reference: no trustworthy verdict or speedup
+        return fail("runtime_error", checks=checks, timings=timings, bad_calls=bad, baseline_bad_calls=base_bad)
     correct = all(c["passed"] for c in checks) and bad == 0
     speedup = geomean_speedup([t["base_median_ms"] for t in timings], [t["cand_median_ms"] for t in timings])
     return ProblemResult(p.name, p.dwarf, "ok" if correct else "wrong_output", correct, speedup, checks, timings,

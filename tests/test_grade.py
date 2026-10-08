@@ -93,3 +93,12 @@ def test_benign_stl_use_has_no_hits(tmp_path):
         'std::sort(v.begin(), v.end()); std::sort(f.begin(), f.end()); std::sort(l.begin(), l.end());\n'
         'if(f.size()>100) return;\n'))
     assert object_hits(compile_object(k, tmp_path / "o")) == []
+
+def test_baseline_bad_calls_make_runtime_error(tmp_path):
+    prob = tmp_path / "vector_add"; shutil.copytree(FIX, prob)
+    (prob / "baseline.cu").write_text(VADD.replace("a[i]+b[i]", "a[i]-b[i]") + (  # wrong baseline
+        'extern "C" void minidwarf_solve(const void* const* in, void* const* out, const long* dims, int nd){'
+        'long n=1; for(int i=0;i<nd;i++) n*=dims[i];'
+        'vadd<<<(int)((n+255)/256),256>>>((const float*)in[0],(const float*)in[1],(float*)out[0],n); }\n'))
+    r = grade_problem(prob, prob / "solutions/expert_v1.cu", tmp_path / "w", reps=4, warmup=0)
+    assert r.status == "runtime_error" and not r.correct and r.baseline_bad_calls > 0 and r.bad_calls == 0
