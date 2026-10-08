@@ -5,6 +5,7 @@
   "quantile": 0.95,
   "repeats": 5,
   "unstable_ratio": 1.05,
+  "eps_global_pooling": "eps_global pools the first `repeats` A/A samples of every problem; extra runs of unstable problems only raise their own eps",
   "env_start": {
     "name": "NVIDIA GeForce RTX 5070 Laptop GPU",
     "driver_version": "580.178.04",

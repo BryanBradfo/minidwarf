@@ -16,6 +16,8 @@ pytestmark = pytest.mark.skipif(shutil.which("nvcc") is None, reason="needs CUDA
 def test_redteam_fixture_is_caught(tmp_path, name, status):
     r = grade_problem(FIX, RT / f"{name}.cu", tmp_path)
     assert r.status == status and r.correct is False
+    if status == "forbidden_api": assert {"calls_cublas": "cublas", "fopen_grader": "file_io"}[name] in r.lint
+    else: assert r.lint == []
     if name in ("memo_static", "memo_copy", "noop", "skip_timed", "index_cache"): assert r.bad_calls > 0
 
 def test_side_stream_work_is_timed(tmp_path):

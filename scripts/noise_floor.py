@@ -20,6 +20,8 @@ def problem_eps(speedups):
 def is_unstable(speedups):
     return max(speedups) / min(speedups) > UNSTABLE_RATIO
 
+POOLING_NOTE = "eps_global pools the first `repeats` A/A samples of every problem; extra runs of unstable problems only raise their own eps"
+
 def _report(per, failed, total, done, env_start, env_end, date, repeats):
     # global eps only once every problem is done and at least half succeeded; pooled over the first `repeats`
     # samples of every problem (equal weight: the extra runs of unstable problems must not inflate it).
@@ -29,13 +31,13 @@ def _report(per, failed, total, done, env_start, env_end, date, repeats):
     out = {k: {**r, "eps": max(r["eps_raw"], g or 0.0)} for k, r in per.items()}
     m = max(r["eps"] for r in out.values()) if enough else None
     return {"eps": g, "eps_global": g, "eps_max": m, "quantile": 0.95, "repeats": repeats,
-            "unstable_ratio": UNSTABLE_RATIO, "env_start": env_start, "env_end": env_end, "date": date,
+            "unstable_ratio": UNSTABLE_RATIO, "eps_global_pooling": POOLING_NOTE, "env_start": env_start, "env_end": env_end, "date": date,
             "per_problem": out, "failed": failed}
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--problems-root", default="problems"); ap.add_argument("--out", default="harness/noise_floor.json")
-    ap.add_argument("--repeats", type=int, default=5, help="A/A runs per problem (eps pools all of them)")
+    ap.add_argument("--repeats", type=int, default=5, help="A/A runs per problem (eps_global pools each problem's first --repeats samples)")
     ap.add_argument("--unstable-repeats", type=int, default=20,
                     help="total A/A runs for problems whose first --repeats spread more than the unstable ratio")
     ap.add_argument("--allow-busy-gpu", action="store_true")

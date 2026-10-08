@@ -68,7 +68,7 @@ def build_leaderboard(runs_dir: Path, eps: float | None = None, noise_floor: Pat
                   f"that problem's own timing noise floor (eps_global = {eps_global:.3f} for unmeasured problems, "
                   f"eps_max = {eps_max:.3f}; harness v{HARNESS_VERSION})."]
     if unstable:
-        lines.append("Unstable timing (bimodal clocks): " + ", ".join(f"{k} (eps {per.get(k, eps_global):.2f})"
+        lines.append("Unstable timing: " + ", ".join(f"{k} (eps {per.get(k, eps_global):.2f})"
                      for k in sorted(unstable)) + " — fast_p for these is reported but low-confidence.")
     if skipped:
         lines.append(f"_Skipped {skipped} run(s) scored with another harness version._")

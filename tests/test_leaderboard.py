@@ -61,6 +61,6 @@ def test_unstable_problems_are_flagged(tmp_path):
     nf.write_text(json.dumps({"eps": 0.01, "eps_global": 0.01,
                               "per_problem": {"p1": {"eps": 0.25, "unstable": True}, "p2": {"eps": 0.01}}}))
     md = build_leaderboard(tmp_path, noise_floor=nf)
-    assert "Unstable timing (bimodal clocks): p1 (eps 0.25)" in md and "low-confidence" in md
+    assert "Unstable timing: p1 (eps 0.25)" in md and "low-confidence" in md
     assert "| m | sparse (unstable timing: p1) |" in md and "| m | dense |" in md
     assert "Unstable timing" not in build_leaderboard(tmp_path, eps=0.0)
