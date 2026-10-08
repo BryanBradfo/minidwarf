@@ -104,7 +104,7 @@
     "atol": 0.0001,
     "status": "ok",
     "bad_calls": 0,
-    "tol_ratio": 0.10245011807141129,
+    "tol_ratio": 0.14391581266454273,
     "verdict": "ok"
   },
   {
@@ -158,7 +158,7 @@
     "atol": 5e-05,
     "status": "ok",
     "bad_calls": 0,
-    "tol_ratio": 0.0647872939443583,
+    "tol_ratio": 0.06766722385948946,
     "verdict": "ok"
   },
   {

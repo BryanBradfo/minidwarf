@@ -223,9 +223,11 @@ provenance: `git_commit`, `problems_digest` (sha256 over every problem's
 `spec.yaml`, `inputs.py`, `reference.py`, `baseline.cu`) and `numpy_version`.
 
 **Noise floor.** `scripts/noise_floor.py` runs A/A tests (baseline vs itself)
-per problem: 5 repeats, floored at `eps_global` (0.0215); problems whose A/A
-max/min exceeds 1.05 are flagged unstable and re-measured with 20 repeats
-(currently `sddmm` eps = 0.222 and `spmm_csr` eps = 0.045). Each problem's
+per problem: 5 repeats, floored at `eps_global` (0.006, pooled over the
+stable problems); problems whose A/A max/min exceeds 1.05 are flagged
+unstable and re-measured with 20 repeats. Currently unstable: `sddmm`
+(eps 0.21) and five compute-bound N-body problems (eps 0.09–0.25), whose
+float32 baselines push the laptop GPU into its power cap. Each problem's
 epsilon `eps_p` is in `harness/noise_floor.json`; the leaderboard lists
 unstable problems as low-confidence.
 
