@@ -242,13 +242,16 @@ expert kernels (`harness/tolerance_report.json`).
 problems a submission gets both **correct** *and* **at least `p`x faster
 than the honest baseline** kernel shipped with the problem (the baseline is
 a straightforward, unoptimized implementation -- not a strawman, but not
-tuned either). On the leaderboard a problem counts toward `fast_p@p` only if
-`speedup >= p * (1 + eps_p)`, where `eps_p` is that problem's noise floor.
-`fast_p@0` is
+tuned either). A problem counts toward `fast_p@p` only if
+`speedup >= p * (1 + eps_p)`, where `eps_p` is that problem's noise floor
+(`eps_global` for unmeasured problems); the leaderboard and `minidwarf suite`
+apply the same rule. `fast_p@0` is
 just the correctness rate (any non-negative speedup counts), and
 `fast_p@1`, `fast_p@2`, `fast_p@5`, ... report the fraction that clears
 increasingly demanding speed bars. `minidwarf suite` reports the full
-curve alongside the raw `compile_rate` and `correctness_rate`, since a low
+noise-floor-adjusted curve (and the `eps_global` it used) alongside the raw
+`compile_rate` (`forbidden_api` counts as not compiled) and
+`correctness_rate`, since a low
 `fast_p` can come from either failing to compile/pass correctness or
 simply being too slow -- those are different failure modes and should be
 reported separately, not collapsed into one number.

@@ -78,3 +78,7 @@ def test_load_noise_floor_tolerates_null_and_missing_eps(tmp_path):
     nf.write_text(json.dumps({"per_problem": {}}))
     with pytest.warns(UserWarning):
         assert load_noise_floor(nf)[0] == 0.0
+
+def test_compile_pct_excludes_forbidden_api(tmp_path):
+    _write(tmp_path / "a", "m", [_row(3.0), {"name": "p2", "dwarf": "dense", "status": "forbidden_api", "correct": False, "speedup": None}])
+    assert "| m | 50.0% | 50.0% |" in build_leaderboard(tmp_path, eps=0.0)
