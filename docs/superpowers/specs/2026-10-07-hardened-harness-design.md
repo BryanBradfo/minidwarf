@@ -75,9 +75,11 @@ and string literals; it is a tripwire, not a sandbox, and the paper says so.
   4. After the last timed rep of each data set, copy its outputs to host;
      the driver writes all D output sets.
   The driver reports median, p25, p75 and all raw rep times as JSON.
-- **ABBA ordering:** for each eval shape the grader runs candidate, baseline,
-  baseline, candidate, pooling the two runs of each binary, to cancel thermal
-  drift. Correctness is checked on every candidate run.
+- **BAAB ordering:** for each eval shape the grader runs baseline, candidate,
+  candidate, baseline, pooling the two runs of each binary, to cancel thermal
+  drift (baseline first so the candidate's timeout can be
+  max(60 s, 50 × the baseline run's wall time)). Correctness is checked on
+  every candidate run.
 - **Speedup:** geometric mean over eval shapes of
   `baseline_median / candidate_median` (v2 used ratio of sums, which lets the
   largest shape dominate).

@@ -209,9 +209,13 @@ is audited manually before results are published. A process sandbox
 call (untimed): upload the data set, NaN-poison outputs, flush L2, run a ~10 ms
 device spin to stabilize clocks. The timed region is
 `eventRecord` -> `minidwarf_solve` -> `cudaDeviceSynchronize` -> `eventRecord`.
-For each shape the grader runs candidate, baseline, baseline, candidate
-(ABBA) and pools the two runs of each binary. The reported speedup is the
-geometric mean over shapes of `baseline_median / candidate_median`.
+For each shape the grader runs baseline, candidate, candidate, baseline
+(BAAB) and pools the two runs of each binary. The reported speedup is the
+geometric mean over shapes of `baseline_median / candidate_median`. A
+candidate run times out after max(60 s, 50x the baseline run's wall time), so
+a correct but slow kernel on a heavy problem is not miscounted as incorrect.
+Set `MINIDWARF_TMP=/dev/shm` to keep the driver's input/output files in RAM
+(much faster at the largest shapes; needs several GB of free memory).
 
 **GPU preflight.** Before timing, the grader refuses to run if another compute
 process is on the GPU: the run aborts with GpuBusyError (exit code 3 from the CLI); it is never scored as a candidate failure.

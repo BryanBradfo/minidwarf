@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-import subprocess
+import subprocess, time
 from dataclasses import dataclass, field
 from pathlib import Path
 import numpy as np
@@ -14,6 +14,11 @@ from .score import geomean_speedup
 
 N_SETS = 4
 CHECK_SEED_OFFSET = 500_000
+SLOW_FACTOR = 50  # a correct candidate may be this many times slower than the baseline run
+
+def candidate_timeout(base_run_s, timeout_s):
+    """Per-run candidate timeout: the fixed floor, or SLOW_FACTOR x the baseline's wall time if larger."""
+    return max(timeout_s, SLOW_FACTOR * base_run_s)
 
 @dataclass
 class ProblemResult:
@@ -67,9 +72,9 @@ def grade_problem(problem_root, candidate_cu, work_dir, seed=12345, reps=20, war
         return fail("compile_error")
 
     checks, timings, bad, base_bad = [], [], 0, 0
-    def cand(ins, exp, shape, shapes, n_reps, n_warm):
+    def cand(ins, exp, shape, shapes, n_reps, n_warm, tmo=timeout_s):
         nonlocal bad
-        r = run_binary(cand_exe, ins, shape, shapes, n_reps, n_warm, timeout_s,
+        r = run_binary(cand_exe, ins, shape, shapes, n_reps, n_warm, tmo,
                        expected_sets=exp, rtol=p.rtol, atol=p.atol)
         if r.n_bad_calls is None: raise RunError("driver did not report n_bad_calls")
         bad += r.n_bad_calls
@@ -83,18 +88,21 @@ def grade_problem(problem_root, candidate_cu, work_dir, seed=12345, reps=20, war
             ins = exp = None  # free the previous shape's data before loading the next
             ins, exp = _cases(p.root, shape, seed + 1000 * i)
             shapes = [e.shape for e in exp[0]]
-            # ABBA order; check each candidate run at once and keep only times, so at most one
-            # run's outputs are alive next to ins/exp (multi-GB at the large eval shapes)
-            ct, bt = [], []
-            for who in ("c", "b", "b", "c"):
+            # BAAB order (baseline first, so the candidate's timeout scales with the measured baseline
+            # run); check each candidate run at once and keep only times, so at most one run's outputs
+            # are alive next to ins/exp (multi-GB at the large eval shapes)
+            ct, bt, tmo = [], [], timeout_s
+            for who in ("b", "c", "c", "b"):
                 if who == "c":
-                    r = cand(ins, exp, shape, shapes, reps, warmup)
+                    r = cand(ins, exp, shape, shapes, reps, warmup, tmo)
                     checks += _checks(r, exp, shape, p, "eval"); ct += r.times_ms
                 else:
                     # verified like the candidate (result unused) so both binaries see the same per-call
                     # host work between timed reps; otherwise GPU clock state differs and A/A drifts 10-30%
+                    t0 = time.perf_counter()
                     r = run_binary(base_exe, ins, shape, shapes, reps, warmup, timeout_s,
                                    expected_sets=exp, rtol=p.rtol, atol=p.atol); bt += r.times_ms
+                    tmo = max(tmo, candidate_timeout(time.perf_counter() - t0, timeout_s))
                     if r.n_bad_calls is None: raise RunError("driver did not report n_bad_calls (baseline)")
                     base_bad += r.n_bad_calls
                 del r

@@ -1,11 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
-import json, subprocess, tempfile
+import json, os, subprocess, tempfile
 from dataclasses import dataclass
 from pathlib import Path
 import numpy as np
 from .problem_io import write_arrays, read_arrays
 
 class RunError(Exception): ...
+
+def work_dir_root():
+    """Directory for the driver's in/out/exp files: $MINIDWARF_TMP (e.g. /dev/shm) or the system default."""
+    return os.environ.get("MINIDWARF_TMP") or None
 
 @dataclass
 class RunResult:
@@ -32,7 +36,7 @@ def run_binary(exe, input_sets, dims, output_shapes, reps=20, warmup=3, timeout_
         raise ValueError("expected_sets must have one entry per input set, matching output_shapes")
     in_counts = [int(np.prod(a.shape)) for a in input_sets[0]]
     out_counts = [int(np.prod(s)) for s in output_shapes]
-    with tempfile.TemporaryDirectory() as d:
+    with tempfile.TemporaryDirectory(dir=work_dir_root()) as d:
         din, dout, dt = Path(d)/"in.bin", Path(d)/"out.bin", Path(d)/"t.json"
         write_arrays(din, [a for s in input_sets for a in s])
         dexp = "-"
