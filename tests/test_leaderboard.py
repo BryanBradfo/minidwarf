@@ -38,6 +38,18 @@ def test_noise_floor_raises_the_bar(tmp_path):
     assert "| m | 100.0% | 100.0% | 0.0% |" in build_leaderboard(tmp_path, eps=0.05)
 
 def test_load_noise_floor(tmp_path):
-    assert load_noise_floor(tmp_path / "missing.json") == 0.0
-    (tmp_path / "nf.json").write_text(json.dumps({"eps": 0.04}))
-    assert load_noise_floor(tmp_path / "nf.json") == 0.04
+    assert load_noise_floor(tmp_path / "missing.json") == (0.0, {})
+    (tmp_path / "nf.json").write_text(json.dumps({"eps": 0.04}))  # old format: global eps only
+    assert load_noise_floor(tmp_path / "nf.json") == (0.04, {})
+    (tmp_path / "nf2.json").write_text(json.dumps({"eps": 0.01, "eps_global": 0.01, "eps_max": 0.2,
+                                                   "per_problem": {"p1": {"eps": 0.2, "speedups": [1.2]}}}))
+    assert load_noise_floor(tmp_path / "nf2.json") == (0.01, {"p1": 0.2})
+
+def test_per_problem_eps_raises_the_bar_for_that_problem_only(tmp_path):
+    _write(tmp_path / "a", "m", [_row(1.1), {**_row(1.1), "name": "p2"}])
+    nf = tmp_path / "nf.json"
+    nf.write_text(json.dumps({"eps": 0.01, "eps_global": 0.01, "per_problem": {"p1": {"eps": 0.2}}}))
+    md = build_leaderboard(tmp_path, noise_floor=nf)
+    assert "| m | 100.0% | 100.0% | 50.0% |" in md  # p1 needs 1.2x, p2 (unmeasured) needs 1.01x
+    assert "eps_global = 0.010" in md and "eps_max = 0.200" in md
+    assert "| m | 100.0% | 100.0% | 100.0% |" in build_leaderboard(tmp_path, eps=0.05, noise_floor=nf)  # override

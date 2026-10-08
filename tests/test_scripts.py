@@ -98,3 +98,5 @@ def test_noise_floor_pools_repeats(tmp_path, monkeypatch):
     assert p0["speedups"] == pytest.approx([1.0, 1.1, 1 / 1.1]) and p0["max"] == pytest.approx(1.1)
     assert rep["eps"] == pytest.approx(m.eps_from_speedups([1.0, 1.1, 1 / 1.1, 1.0, 1.0, 1.0]))
     assert rep["repeats"] == 3 and rep["env_end"] == {"t": 1}
+    assert p0["eps"] == pytest.approx(0.1) and rep["per_problem"]["p1"]["eps"] == pytest.approx(0.0)
+    assert rep["eps_global"] == rep["eps"] and rep["eps_max"] == pytest.approx(0.1)

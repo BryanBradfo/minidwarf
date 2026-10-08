@@ -11,12 +11,18 @@ def eps_from_speedups(speedups, q=0.95):
     """eps such that a (1 + eps) speedup exceeds the q-quantile of |log speedup| in an A/A test."""
     return math.exp(float(np.quantile([abs(math.log(s)) for s in speedups], q))) - 1
 
+def problem_eps(speedups):
+    """Per-problem noise floor: the largest A/A deviation over its repeats, as a (1 + eps) factor."""
+    return math.exp(max(abs(math.log(s)) for s in speedups)) - 1
+
 def _report(per, failed, total, done, env_start, env_end, date, repeats):
-    # eps only once every problem is done and at least half succeeded; pooled over all repeats
+    # global eps only once every problem is done and at least half succeeded; pooled over all repeats.
+    # "eps" (= eps_global) is kept for readers of the old format; the leaderboard uses per_problem[*].eps.
     enough = done == total and len(per) * 2 >= total and per
-    eps = eps_from_speedups([x for r in per.values() for x in r["speedups"]]) if enough else None
-    return {"eps": eps, "quantile": 0.95, "repeats": repeats, "env_start": env_start, "env_end": env_end,
-            "date": date, "per_problem": per, "failed": failed}
+    g = eps_from_speedups([x for r in per.values() for x in r["speedups"]]) if enough else None
+    m = max(r["eps"] for r in per.values()) if enough else None
+    return {"eps": g, "eps_global": g, "eps_max": m, "quantile": 0.95, "repeats": repeats,
+            "env_start": env_start, "env_end": env_end, "date": date, "per_problem": per, "failed": failed}
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
@@ -40,17 +46,19 @@ def main(argv=None):
                 if r.status != "ok" or r.speedup is None or not r.speedup > 0:
                     raise RuntimeError(f"baseline vs itself is {r.status}, speedup={r.speedup}")
                 sp.append(r.speedup)
-            per[pdir.name] = {"speedups": sp, "min": min(sp), "median": float(np.median(sp)), "max": max(sp)}
-            print(f"{pdir.name:28s} min {min(sp):.4f}  median {np.median(sp):.4f}  max {max(sp):.4f}", flush=True)
+            per[pdir.name] = {"eps": problem_eps(sp), "speedups": sp, "min": min(sp), "median": float(np.median(sp)),
+                              "max": max(sp)}
+            print(f"{pdir.name:28s} min {min(sp):.4f}  median {np.median(sp):.4f}  max {max(sp):.4f}  "
+                  f"eps {per[pdir.name]['eps']:.4f}", flush=True)
         except Exception as e:
             failed[pdir.name] = f"{type(e).__name__}: {e}"
             print(f"FAIL {pdir.name}: {failed[pdir.name]}", file=sys.stderr, flush=True)
-        if i == len(specs): env_end = env_record()  # sampled right after the last measurement, while still warm
+        if i == len(specs): env_end = env_record()  # post-run snapshot; the GPU is usually idle again (idle clocks)
         write_report(a.out, _report(per, failed, len(specs), i, env_start, env_end, date, a.repeats))
     rep = _report(per, failed, len(specs), len(specs), env_start, env_end, date, a.repeats)
     if rep["eps"] is None:
         print(f"ERROR: only {len(per)}/{len(specs)} problems succeeded; no eps written", file=sys.stderr); return 1
-    print(f"eps = {rep['eps']:.4f}")
+    print(f"eps_global = {rep['eps_global']:.4f}  eps_max = {rep['eps_max']:.4f}")
     return 1 if failed else 0
 
 if __name__ == "__main__":
