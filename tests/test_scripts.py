@@ -114,3 +114,4 @@ def test_noise_floor_extends_unstable_problems(tmp_path, monkeypatch):
     rep = json.loads(out.read_text()); p0, p1 = rep["per_problem"]["p0"], rep["per_problem"]["p1"]
     assert p0["unstable"] and p0["n_repeats"] == 6 and p0["eps"] == pytest.approx(0.25)  # 1/0.8 over all samples
     assert not p1["unstable"] and p1["n_repeats"] == 2
+    assert rep["eps_global"] == pytest.approx(m.eps_from_speedups([1.0, 1.2, 1.0, 1.0]))  # first 2 per problem only

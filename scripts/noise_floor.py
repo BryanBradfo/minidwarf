@@ -21,10 +21,11 @@ def is_unstable(speedups):
     return max(speedups) / min(speedups) > UNSTABLE_RATIO
 
 def _report(per, failed, total, done, env_start, env_end, date, repeats):
-    # global eps only once every problem is done and at least half succeeded; pooled over all samples.
-    # Per-problem eps = max(own largest deviation, eps_global). "eps" (= eps_global) is kept for old readers.
+    # global eps only once every problem is done and at least half succeeded; pooled over the first `repeats`
+    # samples of every problem (equal weight: the extra runs of unstable problems must not inflate it).
+    # Per-problem eps = max(own largest deviation over all its samples, eps_global). "eps" (= eps_global) is kept.
     enough = done == total and len(per) * 2 >= total and per
-    g = eps_from_speedups([x for r in per.values() for x in r["speedups"]]) if enough else None
+    g = eps_from_speedups([x for r in per.values() for x in r["speedups"][:repeats]]) if enough else None
     out = {k: {**r, "eps": max(r["eps_raw"], g or 0.0)} for k, r in per.items()}
     m = max(r["eps"] for r in out.values()) if enough else None
     return {"eps": g, "eps_global": g, "eps_max": m, "quantile": 0.95, "repeats": repeats,
