@@ -79,14 +79,19 @@ def grade_problem(problem_root, candidate_cu, work_dir, seed=12345, reps=20, war
             shapes = [e.shape for e in exp[0]]
             checks += _checks(cand(ins, exp, shape, shapes, N_SETS, 0), exp, shape, p, "check")
         for i, shape in enumerate(p.eval_shapes):
+            ins = exp = None  # free the previous shape's data before loading the next
             ins, exp = _cases(p.root, shape, seed + 1000 * i)
             shapes = [e.shape for e in exp[0]]
-            c1 = cand(ins, exp, shape, shapes, reps, warmup)  # ABBA order
-            b1 = run_binary(base_exe, ins, shape, shapes, reps, warmup, timeout_s)
-            b2 = run_binary(base_exe, ins, shape, shapes, reps, warmup, timeout_s)
-            c2 = cand(ins, exp, shape, shapes, reps, warmup)
-            checks += _checks(c1, exp, shape, p, "eval") + _checks(c2, exp, shape, p, "eval")
-            ct, bt = c1.times_ms + c2.times_ms, b1.times_ms + b2.times_ms
+            # ABBA order; check each candidate run at once and keep only times, so at most one
+            # run's outputs are alive next to ins/exp (multi-GB at the large eval shapes)
+            ct, bt = [], []
+            for who in ("c", "b", "b", "c"):
+                if who == "c":
+                    r = cand(ins, exp, shape, shapes, reps, warmup)
+                    checks += _checks(r, exp, shape, p, "eval"); ct += r.times_ms
+                else:
+                    r = run_binary(base_exe, ins, shape, shapes, reps, warmup, timeout_s); bt += r.times_ms
+                del r
             timings.append({"shape": list(shape), "cand_median_ms": float(np.median(ct)), "cand_iqr_ms": _iqr(ct),
                             "base_median_ms": float(np.median(bt)), "base_iqr_ms": _iqr(bt)})
     except RunError:
