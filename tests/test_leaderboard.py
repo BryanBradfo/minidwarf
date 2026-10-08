@@ -64,3 +64,17 @@ def test_unstable_problems_are_flagged(tmp_path):
     assert "Unstable timing: p1 (eps 0.25)" in md and "low-confidence" in md
     assert "| m | sparse (unstable timing: p1) |" in md and "| m | dense |" in md
     assert "Unstable timing" not in build_leaderboard(tmp_path, eps=0.0)
+
+def test_load_noise_floor_tolerates_null_and_missing_eps(tmp_path):
+    import pytest
+    nf = tmp_path / "nf.json"
+    nf.write_text(json.dumps({"eps_global": 0.03}))  # no "eps" key: must not KeyError
+    assert load_noise_floor(nf)[0] == 0.03
+    nf.write_text(json.dumps({"eps": 0.04, "eps_global": None}))
+    assert load_noise_floor(nf)[0] == 0.04
+    nf.write_text(json.dumps({"eps": None, "eps_global": None, "per_problem": {"p1": {"eps": None}, "p2": {"eps": 0.1}}}))
+    with pytest.warns(UserWarning):
+        assert load_noise_floor(nf) == (0.0, {"p2": 0.1}, set())
+    nf.write_text(json.dumps({"per_problem": {}}))
+    with pytest.warns(UserWarning):
+        assert load_noise_floor(nf)[0] == 0.0

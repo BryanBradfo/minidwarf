@@ -48,6 +48,7 @@ def main(argv=None):
     ensure_gpu_idle(a.allow_busy_gpu)
     env_start, env_end, date = env_record(), None, datetime.date.today().isoformat()
     per, failed = {}, {}
+    partial = Path(a.out).with_name(Path(a.out).name + ".partial")  # progress goes here; --out is replaced only on completion
     for i, spec in enumerate(specs, 1):
         pdir = spec.parent
         try:
@@ -66,10 +67,12 @@ def main(argv=None):
             failed[pdir.name] = f"{type(e).__name__}: {e}"
             print(f"FAIL {pdir.name}: {failed[pdir.name]}", file=sys.stderr, flush=True)
         if i == len(specs): env_end = env_record()  # post-run snapshot; the GPU is usually idle again (idle clocks)
-        write_report(a.out, _report(per, failed, len(specs), i, env_start, env_end, date, a.repeats))
+        write_report(partial, _report(per, failed, len(specs), i, env_start, env_end, date, a.repeats))
     rep = _report(per, failed, len(specs), len(specs), env_start, env_end, date, a.repeats)
     if rep["eps"] is None:
-        print(f"ERROR: only {len(per)}/{len(specs)} problems succeeded; no eps written", file=sys.stderr); return 1
+        print(f"ERROR: only {len(per)}/{len(specs)} problems succeeded; {a.out} left untouched (see {partial})",
+              file=sys.stderr); return 1
+    write_report(a.out, rep); partial.unlink(missing_ok=True)
     print(f"eps_global = {rep['eps_global']:.4f}  eps_max = {rep['eps_max']:.4f}  unstable = "
           f"{[k for k, r in rep['per_problem'].items() if r['unstable']]}")
     return 1 if failed else 0

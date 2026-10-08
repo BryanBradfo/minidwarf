@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-import json
+import json, warnings
 from pathlib import Path
 from collections import defaultdict
 from .score import HARNESS_VERSION
@@ -21,8 +21,10 @@ def load_noise_floor(path: Path = NOISE_FLOOR) -> tuple[float, dict, set]:
     if not path.exists(): return 0.0, {}, set()
     data = json.loads(path.read_text())
     rows = {k: v for k, v in (data.get("per_problem") or {}).items() if isinstance(v, dict)}
-    per = {k: float(v["eps"]) for k, v in rows.items() if "eps" in v}
-    return float(data.get("eps_global", data["eps"])), per, {k for k, v in rows.items() if v.get("unstable")}
+    per = {k: float(v["eps"]) for k, v in rows.items() if v.get("eps") is not None}
+    g = next((data[k] for k in ("eps_global", "eps") if data.get(k) is not None), None)
+    if g is None: warnings.warn(f"{path}: no eps_global/eps value; using a 0.0 noise floor")
+    return float(g or 0.0), per, {k for k, v in rows.items() if v.get("unstable")}
 
 def build_leaderboard(runs_dir: Path, eps: float | None = None, noise_floor: Path = NOISE_FLOOR) -> str:
     """Aggregate runs_dir/*/scores.json of the current harness version into a Markdown leaderboard.

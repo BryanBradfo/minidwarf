@@ -82,8 +82,10 @@ def test_noise_floor_refuses_eps_below_half(tmp_path, monkeypatch):
     monkeypatch.setattr(m, "grade_problem", lambda *a, **k: SimpleNamespace(status="ok", speedup=next(seq)))
     monkeypatch.setattr(m, "ensure_gpu_idle", _noop); monkeypatch.setattr(m, "env_record", lambda: {})
     out = tmp_path / "nf.json"
+    out.write_text('{"eps": 0.02}')
     assert m.main(["--problems-root", str(root), "--out", str(out), "--repeats", "1"]) == 1
-    assert json.loads(out.read_text())["eps"] is None
+    assert json.loads(out.read_text()) == {"eps": 0.02}  # committed file untouched
+    assert json.loads((tmp_path / "nf.json.partial").read_text())["eps"] is None
 
 def test_noise_floor_pools_repeats(tmp_path, monkeypatch):
     m = _load("noise_floor")
@@ -115,3 +117,28 @@ def test_noise_floor_extends_unstable_problems(tmp_path, monkeypatch):
     assert p0["unstable"] and p0["n_repeats"] == 6 and p0["eps"] == pytest.approx(0.25)  # 1/0.8 over all samples
     assert not p1["unstable"] and p1["n_repeats"] == 2
     assert rep["eps_global"] == pytest.approx(m.eps_from_speedups([1.0, 1.2, 1.0, 1.0]))  # first 2 per problem only
+
+def test_noise_floor_abort_keeps_committed_file(tmp_path, monkeypatch):
+    m = _load("noise_floor")
+    root = _fake_problems(tmp_path / "probs", 3)
+    seq = iter([1.0, KeyboardInterrupt])
+    def grade(*a, **k):
+        v = next(seq)
+        if v is KeyboardInterrupt: raise KeyboardInterrupt
+        return SimpleNamespace(status="ok", speedup=v)
+    monkeypatch.setattr(m, "grade_problem", grade)
+    monkeypatch.setattr(m, "ensure_gpu_idle", _noop); monkeypatch.setattr(m, "env_record", lambda: {})
+    out = tmp_path / "nf.json"; out.write_text('{"eps": 0.02}')
+    with pytest.raises(KeyboardInterrupt):
+        m.main(["--problems-root", str(root), "--out", str(out), "--repeats", "1"])
+    assert json.loads(out.read_text()) == {"eps": 0.02}
+    assert "p0" in json.loads((tmp_path / "nf.json.partial").read_text())["per_problem"]
+
+def test_noise_floor_complete_run_replaces_out_and_drops_partial(tmp_path, monkeypatch):
+    m = _load("noise_floor")
+    root = _fake_problems(tmp_path / "probs", 2)
+    monkeypatch.setattr(m, "grade_problem", lambda *a, **k: SimpleNamespace(status="ok", speedup=1.0))
+    monkeypatch.setattr(m, "ensure_gpu_idle", _noop); monkeypatch.setattr(m, "env_record", lambda: {})
+    out = tmp_path / "nf.json"; out.write_text('{"eps": 0.02}')
+    assert m.main(["--problems-root", str(root), "--out", str(out), "--repeats", "1"]) == 0
+    assert json.loads(out.read_text())["eps_global"] == 0.0 and not (tmp_path / "nf.json.partial").exists()

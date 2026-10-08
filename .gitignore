@@ -11,3 +11,4 @@ results/*.tmp
 runs/
 CLAUDE.md
 .claude.local.md
+*.partial
