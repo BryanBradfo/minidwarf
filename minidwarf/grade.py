@@ -95,7 +95,8 @@ def grade_problem(problem_root, candidate_cu, work_dir, seed=12345, reps=20, war
                     # host work between timed reps; otherwise GPU clock state differs and A/A drifts 10-30%
                     r = run_binary(base_exe, ins, shape, shapes, reps, warmup, timeout_s,
                                    expected_sets=exp, rtol=p.rtol, atol=p.atol); bt += r.times_ms
-                    base_bad += r.n_bad_calls or 0
+                    if r.n_bad_calls is None: raise RunError("driver did not report n_bad_calls (baseline)")
+                    base_bad += r.n_bad_calls
                 del r
             timings.append({"shape": list(shape), "cand_median_ms": float(np.median(ct)), "cand_iqr_ms": _iqr(ct),
                             "base_median_ms": float(np.median(bt)), "base_iqr_ms": _iqr(bt)})
