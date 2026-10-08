@@ -2,8 +2,8 @@
 name: sddmm
 dwarf: sparse
 difficulty: hard
-rtol: 1.0e-3
-atol: 1.0e-3
+rtol: 1.0e-4
+atol: 1.0e-4
 n_inputs: 4
 n_outputs: 1
 eval_shapes: [[8192, 8192, 64, 8388608], [6000, 9000, 48, 6000000]]

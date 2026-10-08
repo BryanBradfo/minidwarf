@@ -2,8 +2,8 @@
 name: spmv_transpose
 dwarf: sparse
 difficulty: hard
-rtol: 1.0e-3
-atol: 1.0e-3
+rtol: 5.0e-5
+atol: 5.0e-5
 n_inputs: 4
 n_outputs: 1
 eval_shapes: [[2097152, 2097152, 67108864], [1800000, 2500000, 50000000]]

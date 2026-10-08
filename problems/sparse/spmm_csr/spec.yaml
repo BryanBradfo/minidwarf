@@ -2,8 +2,8 @@
 name: spmm_csr
 dwarf: sparse
 difficulty: hard
-rtol: 1.0e-3
-atol: 1.0e-3
+rtol: 5.0e-5
+atol: 5.0e-5
 n_inputs: 4
 n_outputs: 1
 eval_shapes: [[262144, 262144, 6291456, 32], [250000, 300000, 8000000, 24]]

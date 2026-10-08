@@ -2,8 +2,8 @@
 name: jacobi_sparse
 dwarf: sparse
 difficulty: hard
-rtol: 1.0e-3
-atol: 1.0e-4
+rtol: 5.0e-4
+atol: 1.0e-9
 n_inputs: 5
 n_outputs: 1
 eval_shapes: [[2097152, 2097152, 67108864], [1800000, 1800000, 50000000]]
