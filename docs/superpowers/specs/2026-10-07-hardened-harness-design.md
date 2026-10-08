@@ -82,10 +82,17 @@ and string literals; it is a tripwire, not a sandbox, and the paper says so.
   `baseline_median / candidate_median` (v2 used ratio of sums, which lets the
   largest shape dominate).
 - **Noise floor:** `scripts/noise_floor.py` runs an A/A test (baseline vs
-  itself, ABBA) over all problems and writes ε (95th percentile of
-  |log speedup|) to `harness/noise_floor.json`. Reported speedups keep their
-  raw value; the leaderboard's `fast_p@p` counts a problem only if
-  `speedup ≥ p · (1 + ε)`.
+  itself, ABBA) with 5 repeats per problem and writes, per problem,
+  ε_p = exp(max_r |log s_r|) − 1 plus the spread, and globally `eps_global`
+  (95th percentile of pooled |log s|) and `eps_max`, to
+  `harness/noise_floor.json`. Reported speedups keep their raw value; the
+  leaderboard's `fast_p@p` counts a problem only if `speedup ≥ p · (1 + ε_p)`
+  (ε_global for problems without a measurement). Per-problem thresholds exist
+  because some problems (e.g. sddmm on the laptop GPU) switch power/clock
+  states between processes; the paper reports them, it does not hide them.
+- **Pre-call clock stabilisation:** after the per-rep upload/poison/flush,
+  the driver runs a fixed ~10 ms device spin (identical in both binaries,
+  outside the timer) so each timed call starts at steady clocks.
 - **GPU preflight:** before any timing, the grader queries
   `nvidia-smi --query-compute-apps` and refuses to time (status
   `gpu_busy`, raised as an error for the whole run, not scored as a candidate
