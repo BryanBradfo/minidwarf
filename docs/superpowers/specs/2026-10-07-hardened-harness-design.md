@@ -186,3 +186,7 @@ tests and any timing run only when the preflight shows the GPU idle.
 - New dwarfs, perturbed variants, ≥ 6 problems per dwarf → SP4 spec.
 - Models, n samples per problem, bootstrap/mixed-effects analysis, manual
   validation of taxonomy labels → SP5 spec.
+- Best-of-n selection bias → SP5 requirement: the best-of-n kernel selected
+  per problem must be re-timed in a fresh confirmatory grade (or the noise
+  floor eps scaled with n) before its speedup is reported; the max over n
+  noisy timings is biased upward.
