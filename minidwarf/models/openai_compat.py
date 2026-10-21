@@ -9,7 +9,10 @@ class OpenAICompatModel(Model):
     (local Ollama/vLLM or a hosted OpenAI-compatible API like Gemini's)."""
     def __init__(self, config: EvalConfig):
         self._cfg = config
-        self._client = OpenAI(base_url=config.base_url, api_key=config.resolve_api_key())
+        # free-tier APIs return bursts of 429s: retry with the SDK's exponential backoff rather than
+        # recording an empty kernel, which would be scored as a model failure
+        self._client = OpenAI(base_url=config.base_url, api_key=config.resolve_api_key(),
+                              max_retries=10, timeout=600)
 
     def generate(self, prompt: str) -> GenResult:
         try:
