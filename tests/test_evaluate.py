@@ -132,3 +132,18 @@ def test_generation_failures_are_not_graded(tmp_path, monkeypatch):
     data = _json.loads(score_run(run, problems_root=tmp_path).read_text())
     assert graded == ["a0.cu"] and [p["name"] for p in data["per_problem"]] == ["a"]
     assert data["not_generated"] == ["b"] and data["n_samples_graded"] == {"a": 1}
+
+def test_every_sample_is_kept(tmp_path, monkeypatch):
+    import json as _json
+    import minidwarf.preflight as pf, minidwarf.evaluate as ev
+    monkeypatch.setattr(pf, "_smi", lambda args: "")
+    out = iter([ProblemResult("a", "smoke", "compile_error", False, None, error="x"),
+                ProblemResult("a", "smoke", "ok", True, 2.0)])
+    monkeypatch.setattr(ev, "grade_problem", lambda *a, **k: next(out))
+    run = tmp_path / "r"; run.mkdir()
+    rows = [{"problem": "a", "dwarf": "smoke", "model": "m", "kernel_path": f"kernels/a{i}.cu", "sample": i,
+             "generation_status": "success"} for i in range(2)]
+    (run / "results.jsonl").write_text("".join(_json.dumps(r) + "\n" for r in rows))
+    p = _json.loads(score_run(run, problems_root=tmp_path).read_text())["per_problem"][0]
+    assert p["status"] == "ok"  # best-of-n stays the headline
+    assert [s["status"] for s in p["samples"]] == ["compile_error", "ok"] and p["samples"][0]["sample"] == 0

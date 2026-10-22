@@ -57,7 +57,10 @@ def score_run(run_dir: Path, problems_root: Path = Path("problems"), allow_busy_
         for row in group:
             with tempfile.TemporaryDirectory() as wd:
                 graded.append(grade_problem(pdir, run_dir / row["kernel_path"], Path(wd)))
-        per_problem.append(asdict(best_result(graded)))
+        # best-of-n is the headline; every sample is kept for pass@1 and the failure taxonomy
+        samples = [{"sample": row.get("sample", i), **{k: v for k, v in asdict(r).items() if k not in ("name", "dwarf")}}
+                   for i, (row, r) in enumerate(zip(group, graded))]
+        per_problem.append({**asdict(best_result(graded)), "samples": samples})
     out = run_dir / "scores.json"
     doc = sanitize({"model": model, "harness_version": HARNESS_VERSION, "git_commit": git_commit(),
                     "problems_digest": problems_digest(problems_root), "numpy_version": np.__version__,
