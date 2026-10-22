@@ -40,9 +40,13 @@ def score_run(run_dir: Path, problems_root: Path = Path("problems"), allow_busy_
     run_dir = Path(run_dir)
     (run_dir / "scores.json").unlink(missing_ok=True)
     rows = [json.loads(l) for l in (run_dir / "results.jsonl").read_text().splitlines()]
-    by_problem = defaultdict(list)
+    by_problem, seen = defaultdict(list), {}
     for row in rows:
-        by_problem[(row["problem"], row["dwarf"])].append(row)
+        seen[row["problem"]] = row["dwarf"]
+        # API/quota failures produced no kernel: they are not model failures and are not graded
+        if row.get("generation_status", "success") == "success":
+            by_problem[(row["problem"], row["dwarf"])].append(row)
+    not_generated = sorted(p for p in seen if not any(p == n for n, _ in by_problem))
     model = rows[0]["model"] if rows else "unknown"
     env_start, per_problem, busy_seen = env_record(), [], {}
     for (name, dwarf), group in sorted(by_problem.items()):
@@ -53,11 +57,15 @@ def score_run(run_dir: Path, problems_root: Path = Path("problems"), allow_busy_
         for row in group:
             with tempfile.TemporaryDirectory() as wd:
                 graded.append(grade_problem(pdir, run_dir / row["kernel_path"], Path(wd)))
-        per_problem.append(asdict(best_result(graded)))
+        # best-of-n is the headline; every sample is kept for pass@1 and the failure taxonomy
+        samples = [{"sample": row.get("sample", i), **{k: v for k, v in asdict(r).items() if k not in ("name", "dwarf")}}
+                   for i, (row, r) in enumerate(zip(group, graded))]
+        per_problem.append({**asdict(best_result(graded)), "samples": samples})
     out = run_dir / "scores.json"
     doc = sanitize({"model": model, "harness_version": HARNESS_VERSION, "git_commit": git_commit(),
                     "problems_digest": problems_digest(problems_root), "numpy_version": np.__version__,
-                    "allow_busy_gpu": allow_busy_gpu, "busy_seen": busy_seen,
+                    "allow_busy_gpu": allow_busy_gpu, "busy_seen": busy_seen, "not_generated": not_generated,
+                    "n_samples_graded": {n: len(g) for (n, _), g in sorted(by_problem.items())},
                     "env": {"start": env_start, "end": env_record()}, "per_problem": per_problem})
     tmp = run_dir / "scores.json.tmp"
     tmp.write_text(json.dumps(doc, indent=2, allow_nan=False)); os.replace(tmp, out)

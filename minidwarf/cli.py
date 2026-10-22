@@ -24,6 +24,7 @@ def main(argv=None):
     ev.add_argument("--config", required=True); ev.add_argument("--split", required=True)
     ev.add_argument("--runs-dir", default="runs"); ev.add_argument("--run-id", default=None)
     ev.add_argument("--only", default=None); ev.add_argument("--canned-file", default=None)
+    ev.add_argument("--resume", action="store_true", help="keep successful samples, regenerate missing/failed ones")
     ev.add_argument("--allow-busy-gpu", action="store_true")
     sc = sub.add_parser("score")
     sc.add_argument("--run-dir", required=True); sc.add_argument("--problems-root", default="problems")
@@ -59,7 +60,7 @@ def main(argv=None):
         canned = Path(a.canned_file).read_text() if a.canned_file else None
         model = create_model(cfg, canned_text=canned) if cfg.provider == "dummy" else None
         run_id = a.run_id or f"{cfg.model_name}-{a.split}"
-        run_dir = run_generation(cfg, dirs, Path(a.runs_dir), run_id, model=model)
+        run_dir = run_generation(cfg, dirs, Path(a.runs_dir), run_id, model=model, resume=a.resume)
         scores, rc = _score(run_dir, allow_busy=a.allow_busy_gpu)
         if rc: return rc
         print(json.dumps({"run_dir": str(run_dir), "scores": str(scores)})); return 0
