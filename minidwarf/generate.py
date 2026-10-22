@@ -32,8 +32,10 @@ def resolve_split(split, problems_root=Path("problems"), splits_file=Path("SPLIT
     return sorted(dirs, key=lambda d: d.name)
 
 def _is_daily_quota(res) -> bool:
+    """Errors that no retry today can fix: daily quota exhausted, or the model is gone/forbidden."""
     e = (res.error or "")
-    return res.status == "error" and ("PerDay" in e or "per day" in e.lower())
+    return res.status == "error" and ("PerDay" in e or "per day" in e.lower()
+                                      or any(f"Error code: {c}" in e for c in (401, 403, 404)))
 
 def _write_rows(path, rows):
     tmp = path.with_suffix(".jsonl.tmp")
