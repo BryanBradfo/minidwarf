@@ -52,3 +52,9 @@ def test_daily_quota_stops_generation_without_recording_failures(tmp_path):
     run_dir = run_generation(_cfg(3), [SMOKE], tmp_path, "r", model=m)
     rows = [json.loads(l) for l in (run_dir / "results.jsonl").read_text().splitlines()]
     assert m.calls == 2 and len(rows) == 1 and rows[0]["generation_status"] == "success"
+
+def test_unavailable_model_stops_generation(tmp_path):
+    gone = GenResult("", "error", "Error code: 404 - model is no longer available to new users")
+    m = _Scripted([gone, _OK])
+    run_dir = run_generation(_cfg(2), [SMOKE], tmp_path, "r", model=m)
+    assert m.calls == 1 and (run_dir / "results.jsonl").read_text() == ""

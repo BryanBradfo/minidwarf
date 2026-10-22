@@ -1,7 +1,7 @@
-model_name: gemini-3.1-pro-preview
+model_name: gemini-3.6-flash
 base_url: https://generativelanguage.googleapis.com/v1beta/openai/
-provider_model_name: gemini-3.1-pro-preview
+provider_model_name: gemini-3.6-flash
 api_key_env_var: GEMINI_API_KEY
 temperature: 0.2
 max_output_tokens: 16384
-n_samples: 3
+n_samples: 5
