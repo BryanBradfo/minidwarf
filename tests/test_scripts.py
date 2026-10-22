@@ -148,3 +148,18 @@ def test_noise_floor_global_falls_back_when_all_unstable():
     per = {f"p{i}": {"speedups": [1.0, 1.3], "eps_raw": 0.3, "unstable": True} for i in range(2)}
     rep = m._report(per, {}, 2, 2, {}, {}, "d", 2)
     assert rep["eps_global"] == pytest.approx(m.eps_from_speedups([1.0, 1.3, 1.0, 1.3]))
+
+def test_campaign_step_skips_grading_when_gpu_busy(tmp_path):
+    from minidwarf.preflight import GpuBusyError
+    m = _load("run_campaign")
+    calls = []
+    def gen(cfg, dirs, runs, run_id, resume):
+        calls.append((cfg.n_samples, run_id, resume, len(dirs))); return tmp_path
+    def busy(run_dir): raise GpuBusyError("GPU busy")
+    line = m.step("gemini-3.8-flash", 3, tmp_path, gen=gen, score=busy)
+    assert calls == [(3, "gemini-3.8-flash-all-n3", True, 24)] and "grading skipped" in line
+
+def test_campaign_step_never_raises():
+    m = _load("run_campaign")
+    def boom(*a, **k): raise RuntimeError("network down")
+    assert "generation failed" in m.step("gemini-3.8-flash", 3, "runs", gen=boom)
