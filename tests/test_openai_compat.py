@@ -28,3 +28,8 @@ def test_generate_error_is_captured():
         OC.return_value.chat.completions.create.side_effect = RuntimeError("boom")
         r = OpenAICompatModel(CFG).generate("p")
         assert r.status == "error" and "boom" in (r.error or "")
+
+def test_client_retries_generously_for_free_tier_rate_limits():
+    m = OpenAICompatModel(EvalConfig(model_name="m", base_url="http://x/v1", provider_model_name="p",
+                                     api_key_env_var="", n_samples=1))
+    assert m._client.max_retries >= 8  # a 429 burst must not become an "empty kernel" (model failure)

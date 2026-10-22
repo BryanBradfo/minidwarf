@@ -31,6 +31,7 @@ def test_broken_is_compile_error(tmp_path):
     bad = tmp_path / "bad.cu"; bad.write_text("nope")
     r = grade_problem(FIX, bad, tmp_path)
     assert r.status == "compile_error"
+    assert "error" in r.error and len(r.error) <= 4000  # nvcc diagnostics kept for the failure taxonomy
 
 def test_baseline_trusted_against_itself(tmp_path):
     r = grade_problem(FIX, FIX / "baseline.cu", tmp_path, trusted=True)

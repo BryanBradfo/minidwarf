@@ -16,3 +16,11 @@ def test_plain_triple_fence():
 def test_no_fence_returns_whole_text():
     t = "extern \"C\" void minidwarf_solve(){}"
     assert extract_kernel(t).strip() == t
+
+def test_fence_with_trailing_words_on_info_line():
+    # small models parrot the instruction "in a single ```cuda fenced block"
+    src = '```cuda fenced block\n#include <cuda_runtime.h>\nint x;\n```'
+    assert extract_kernel(src) == "#include <cuda_runtime.h>\nint x;"
+
+def test_unclosed_fence_from_truncated_response():
+    assert extract_kernel("Here:\n```cuda\nint x;\nint y;") == "int x;\nint y;"

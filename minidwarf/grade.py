@@ -13,6 +13,11 @@ from .correctness import compare
 from .score import geomean_speedup
 
 N_SETS = 4
+MAX_ERROR = 4000
+
+def _diag(e):
+    return str(e)[:MAX_ERROR]
+
 CHECK_SEED_OFFSET = 500_000
 SLOW_FACTOR = 50  # a correct candidate may be this many times slower than the baseline run
 
@@ -32,6 +37,7 @@ class ProblemResult:
     lint: list = field(default_factory=list)
     bad_calls: int = 0
     baseline_bad_calls: int = 0  # non-zero means the problem/harness is broken, not the candidate
+    error: str = ""  # compiler/runtime diagnostics (truncated), raw material for the failure taxonomy
 
 def _cases(root, shape, seed0):
     cases = [cached_case(root, shape, seed0 + d) for d in range(N_SETS)]
@@ -68,8 +74,8 @@ def grade_problem(problem_root, candidate_cu, work_dir, seed=12345, reps=20, war
             if hits: return fail("forbidden_api", lint=hits)
             cand_exe = link_binary(obj, work_dir / "cand", extra_flags=lib_flags(p.allowed_libs))
         base_exe = compile_binary(p.root / "baseline.cu", work_dir / "base", extra_flags=base_flags)
-    except (CompileError, subprocess.TimeoutExpired):
-        return fail("compile_error")
+    except (CompileError, subprocess.TimeoutExpired) as e:
+        return fail("compile_error", error=_diag(e))
 
     checks, timings, bad, base_bad = [], [], 0, 0
     def cand(ins, exp, shape, shapes, n_reps, n_warm, tmo=timeout_s):
@@ -108,10 +114,10 @@ def grade_problem(problem_root, candidate_cu, work_dir, seed=12345, reps=20, war
                 del r
             timings.append({"shape": list(shape), "cand_median_ms": float(np.median(ct)), "cand_iqr_ms": _iqr(ct),
                             "base_median_ms": float(np.median(bt)), "base_iqr_ms": _iqr(bt)})
-    except RunError:
-        return fail("runtime_error", checks=checks, timings=timings, bad_calls=bad)
-    except subprocess.TimeoutExpired:
-        return fail("timeout", checks=checks, timings=timings, bad_calls=bad)
+    except RunError as e:
+        return fail("runtime_error", checks=checks, timings=timings, bad_calls=bad, error=_diag(e))
+    except subprocess.TimeoutExpired as e:
+        return fail("timeout", checks=checks, timings=timings, bad_calls=bad, error=_diag(e))
 
     if base_bad:  # the baseline itself disagrees with the reference: no trustworthy verdict or speedup
         return fail("runtime_error", checks=checks, timings=timings, bad_calls=bad, baseline_bad_calls=base_bad)

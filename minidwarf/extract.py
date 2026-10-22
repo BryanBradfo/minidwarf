@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 import re
 
-_FENCE = re.compile(r"```[ \t]*([A-Za-z0-9+#]*)[ \t]*\r?\n(.*?)```", re.DOTALL)
+# info string = first word; anything after it on the opening line is ignored ("```cuda fenced block");
+# a fence left open by a truncated response runs to the end of the text
+_FENCE = re.compile(r"```[ \t]*([A-Za-z0-9+#]*)[^\n]*\n(.*?)(?:```|\Z)", re.DOTALL)
 _LANGS = {"cuda", "cpp", "c", "cu", "c++", ""}
 
 def extract_kernel(text: str) -> str:
