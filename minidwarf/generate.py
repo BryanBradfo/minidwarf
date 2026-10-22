@@ -31,26 +31,46 @@ def resolve_split(split, problems_root=Path("problems"), splits_file=Path("SPLIT
             if p.parent.name in names]
     return sorted(dirs, key=lambda d: d.name)
 
-def run_generation(config: EvalConfig, problem_dirs, out_dir, run_id, model: Model | None = None):
-    """Generate n_samples kernels per problem; write results.jsonl + kernels/."""
+def _is_daily_quota(res) -> bool:
+    e = (res.error or "")
+    return res.status == "error" and ("PerDay" in e or "per day" in e.lower())
+
+def _write_rows(path, rows):
+    tmp = path.with_suffix(".jsonl.tmp")
+    tmp.write_text("".join(json.dumps(r) + "\n" for r in rows)); tmp.replace(path)
+
+def run_generation(config: EvalConfig, problem_dirs, out_dir, run_id, model: Model | None = None, resume=False):
+    """Generate n_samples kernels per problem; write results.jsonl + kernels/.
+
+    resume=True keeps existing successful samples and only (re)generates missing or failed ones.
+    Results are rewritten after every sample, and generation stops at a daily-quota error (nothing is
+    recorded for that sample, so a later resume picks it up)."""
     model = model or create_model(config)
     run_dir = Path(out_dir) / run_id
     (run_dir / "kernels").mkdir(parents=True, exist_ok=True)
-    with open(run_dir / "results.jsonl", "w") as jf:
-        for pdir in problem_dirs:
-            pdir = Path(pdir)
-            dwarf = pdir.parent.name
-            prompt = SYSTEM_PROMPT + (pdir / "prompt.md").read_text()
-            for i in range(config.n_samples):
-                res = model.generate(prompt)
-                kernel = extract_kernel(res.text)
-                kpath = run_dir / "kernels" / f"{pdir.name}__s{i}.cu"
-                kpath.write_text(kernel)
-                jf.write(json.dumps({
-                    "problem": pdir.name, "dwarf": dwarf, "sample": i,
-                    "generation_status": res.status, "error": res.error,
-                    "kernel_path": str(kpath.relative_to(run_dir)),
-                    "raw_response": res.text,
-                    "model": config.model_name,
-                }) + "\n")
+    path = run_dir / "results.jsonl"
+    done = {}
+    if resume and path.exists():
+        for l in path.read_text().splitlines():
+            r = json.loads(l)
+            if r.get("generation_status") == "success": done[(r["problem"], r["sample"])] = r
+    rows = []
+    for pdir in problem_dirs:
+        pdir = Path(pdir)
+        prompt = SYSTEM_PROMPT + (pdir / "prompt.md").read_text()
+        for i in range(config.n_samples):
+            if (pdir.name, i) in done:
+                rows.append(done[(pdir.name, i)]); continue
+            res = model.generate(prompt)
+            if _is_daily_quota(res):
+                rows += [r for (p, s), r in done.items() if r not in rows]
+                _write_rows(path, rows); return run_dir
+            kpath = run_dir / "kernels" / f"{pdir.name}__s{i}.cu"
+            kpath.write_text(extract_kernel(res.text))
+            rows.append({"problem": pdir.name, "dwarf": pdir.parent.name, "sample": i,
+                         "generation_status": res.status, "error": res.error,
+                         "kernel_path": str(kpath.relative_to(run_dir)),
+                         "raw_response": res.text, "model": config.model_name})
+            _write_rows(path, rows + [r for r in done.values() if r not in rows])
+    _write_rows(path, rows)
     return run_dir

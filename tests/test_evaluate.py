@@ -117,3 +117,18 @@ def test_cli_run_prints_strict_json(monkeypatch, capsys):
     assert cli.main(["run", "--problem", "x", "--kernel", "y"]) == 0
     out = capsys.readouterr().out
     assert "NaN" not in out and _json.loads(out)["speedup"] is None
+
+def test_generation_failures_are_not_graded(tmp_path, monkeypatch):
+    import json as _json
+    import minidwarf.preflight as pf, minidwarf.evaluate as ev
+    monkeypatch.setattr(pf, "_smi", lambda args: "")  # idle GPU
+    graded = []
+    monkeypatch.setattr(ev, "grade_problem", lambda pdir, k, wd: graded.append(k.name) or ProblemResult("a", "smoke", "ok", True, 1.0))
+    run = tmp_path / "r"; run.mkdir()
+    rows = [{"problem": "a", "dwarf": "smoke", "model": "m", "kernel_path": "kernels/a0.cu", "generation_status": "success"},
+            {"problem": "a", "dwarf": "smoke", "model": "m", "kernel_path": "kernels/a1.cu", "generation_status": "error"},
+            {"problem": "b", "dwarf": "smoke", "model": "m", "kernel_path": "kernels/b0.cu", "generation_status": "error"}]
+    (run / "results.jsonl").write_text("".join(_json.dumps(r) + "\n" for r in rows))
+    data = _json.loads(score_run(run, problems_root=tmp_path).read_text())
+    assert graded == ["a0.cu"] and [p["name"] for p in data["per_problem"]] == ["a"]
+    assert data["not_generated"] == ["b"] and data["n_samples_graded"] == {"a": 1}
